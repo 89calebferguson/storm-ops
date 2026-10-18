@@ -2765,7 +2765,6 @@ async function onMapClick(e){
   const { lat, lng } = e.latlng;
   const popup = L.popup().setLatLng(e.latlng).setContent('<div class="popup-title">Looking up…</div>').openOn(leafletMap);
   const r = await ownerLookupCore(lat, lng);
-  r.acc = acc;
   lastOwnerResult = r;
   const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   const rows = parcelRows(r.p);
@@ -3976,6 +3975,7 @@ async function runOwnerLookup(lat, lng, acc){
   document.getElementById('ownerResult').innerHTML = '<div class="owner-card"><div class="mini-map" id="ownerMiniMap"></div><p class="mini-cap">Checking this spot…</p></div>';
   miniMap('ownerMiniMap', lat, lng, null, { acc });
   const r = await ownerLookupCore(lat, lng);
+  r.acc = acc;
   lastOwnerResult = r;
   renderOwnerResult(r);
   const rows = parcelRows(r.p);
