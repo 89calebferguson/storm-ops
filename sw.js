@@ -1,6 +1,6 @@
 // Storm Ops service worker: keeps the app itself, the map library, fonts and
 // every map/satellite tile you've looked at available with no signal.
-const VERSION = 'stormops-v3.2.1';
+const VERSION = 'stormops-v3.3.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',
@@ -47,6 +47,8 @@ self.addEventListener('fetch', e=>{
     }));
     return;
   }
+  // Town contact lists: always fresh; the app keeps its own saved copy.
+  if(url.startsWith(self.location.origin) && url.includes('/towns/')) return;
   // Libraries, fonts and the app's own files: cache-first.
   if(isStatic(url) || url.startsWith(self.location.origin)){
     e.respondWith(caches.match(req).then(hit=> hit || fetch(req).then(r=>{ if(r.ok || r.type === 'opaque'){ const copy = r.clone(); caches.open(VERSION).then(c=>c.put(req, copy)); } return r; })));

@@ -364,6 +364,26 @@
   .mini-cap{ font-size:12px; color:var(--text-dim); margin:-4px 0 10px; }
   .fix-line{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-top:6px; }
   .fix-line a{ color:var(--accent); }
+  .aff-map{ height:420px; border-radius:8px; overflow:hidden; border:1px solid var(--line); margin:8px 0; background:var(--panel); }
+  .aff-toggles{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .aff-tg{ font-size:13px; padding:8px 10px; border:1px solid var(--line); border-radius:20px; background:var(--panel); cursor:pointer; }
+  .aff-tg.on{ border-color:var(--accent); }
+  .aff-tg input{ margin-right:4px; }
+  .aff-legend{ font-size:12px; color:var(--text-dim); line-height:1.9; }
+  .aff-legend .sw{ display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:-2px; margin:0 4px 0 8px; opacity:.8; }
+  .aff-legend .sw:first-child, .aff-legend .dot:first-child{ margin-left:0; }
+  .aff-legend .dot{ display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:-1px; margin:0 4px 0 8px; border:2px solid #fff; box-shadow:0 0 0 1px #0003; }
+  .aff-rank{ font-family:var(--font-mono); font-size:18px; font-weight:700; color:#fff; background:var(--danger); border-radius:6px; min-width:34px; text-align:center; padding:6px 4px; }
+  .aff-about{ margin:14px 0 24px; font-size:13px; color:var(--text-dim); }
+  .aff-about summary{ cursor:pointer; font-weight:600; color:var(--text); }
+  .gust-lbl{ background:transparent; border:0; box-shadow:none; font-family:var(--font-mono); font-weight:700; font-size:11px; color:#111; text-shadow:0 0 3px #fff, 0 0 3px #fff; }
+  #leafletMap, .mini-map, .aff-map{ position:relative; z-index:0; } /* keep map panes under the sticky header */
+  .town-group{ border:2px solid var(--accent); border-radius:10px; padding:10px; }
+  .town-links{ margin-top:8px; }
+  .aff-pin{ font-size:20px; line-height:24px; text-align:center; filter:drop-shadow(0 0 2px #fff); }
+  .terr-sw{ width:16px; height:16px; border-radius:4px; flex:none; margin-right:10px; align-self:center; }
+  .terr-rep{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin:10px 0 4px; display:flex; align-items:center; gap:6px; }
+  .terr-lbl{ background:rgba(255,255,255,.85); border:0; border-radius:4px; font-weight:700; font-size:12px; color:#111; padding:2px 6px; box-shadow:none; }
   .diag-out{ white-space:pre-wrap; font-family:var(--font-mono); font-size:11px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px; margin-top:8px; text-align:left; }
   .wind-now{ display:flex; gap:14px; align-items:center; background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--accent); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
   .wind-now.wind-warn{ border-left-color:#e0a100; } .wind-now.wind-danger{ border-left-color:var(--danger); }
@@ -485,6 +505,7 @@
     <button class="tab" data-tab="sales"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg><span>Sales</span></button>
     <button class="tab" data-tab="jobs"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/><path d="M8.5 17h7"/></svg><span>Jobs</span></button>
     <button class="tab" data-tab="map"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+    <button class="tab" data-tab="affected"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L5 13h6l-1 9 8-11h-6z"/></svg><span>Affected</span></button>
     <button class="tab" data-tab="safety"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16h.01"/></svg><span>Safety</span></button>
     <button class="tab" data-tab="needs"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A5 5 0 0 1 21 19"/></svg><span>Crew</span></button>
     <button class="tab" data-tab="notes"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5"/><path d="M8 13h8M8 17h6"/></svg><span>Notes</span></button>
@@ -545,6 +566,10 @@
 
   <!-- CONTACTS VIEW -->
   <div class="view" id="view-contacts">
+    <div class="ac-wrap" style="margin:0 0 10px;">
+      <div class="field" style="margin:0;"><input type="text" id="contactsTownInput" autocomplete="off" placeholder="Look up any town (e.g. Lansing, IL)"></div>
+      <div class="ac-list" id="acListContacts"></div>
+    </div>
     <p class="section-label">Who To Call Here</p>
     <p class="hint" id="contactsAreaLine">Load an area on the Here tab and local offices fill in automatically.</p>
     <div id="contactsCallList"></div>
@@ -592,6 +617,8 @@
     <p class="hint">Trees down, stay-away houses, and photo notes. Add one by tapping a lot on the Map tab, or flag the spot you're standing on.</p>
     <div class="btn-row" style="margin-bottom:10px;">
       <button class="small-btn" type="button" onclick="flagHere('tree')">🌳 Tree Down Here</button>
+      <button class="small-btn" type="button" onclick="flagHere('stump')">🪵 Stump Here</button>
+      <button class="small-btn" type="button" onclick="flagHere('road')">🚧 Road Closed Here</button>
       <button class="small-btn" type="button" onclick="flagHere('stay')">⛔ Stay Away Here</button>
       <button class="small-btn" type="button" onclick="flagHere('note')">📷 Photo Note Here</button>
     </div>
@@ -646,6 +673,25 @@
 
   <!-- SALES VIEW -->
   <div class="view" id="view-sales">
+    <p class="section-label">Sales Territories</p>
+    <p class="hint">Draw an area and give it to a salesperson so nobody knocks the same doors. Each person keeps one color.</p>
+    <div class="btn-row" style="margin-bottom:6px;">
+      <button class="small-btn go" id="terrDrawBtn" type="button">✏️ Draw Territory</button>
+      <button class="small-btn" id="terrUndoBtn" type="button" hidden>↶ Undo</button>
+      <button class="small-btn go" id="terrFinishBtn" type="button" hidden>Finish</button>
+      <button class="small-btn" id="terrCancelBtn" type="button" hidden>Cancel</button>
+      <button class="small-btn" id="terrSatBtn" type="button">🛰️ Satellite</button>
+    </div>
+    <div class="status-line" id="terrStatus">Tap Draw Territory, then tap the corners of the area on the map.</div>
+    <div id="salesMap" class="aff-map" style="height:380px;"></div>
+    <div class="install-box" id="terrForm" hidden>
+      <div class="field"><label>Territory name</label><input type="text" id="terrName"></div>
+      <div class="field"><label>Salesperson</label><input type="text" id="terrRep" list="terrReps" placeholder="e.g. Sales 1 or their name"><datalist id="terrReps"></datalist></div>
+      <div class="field"><label>Notes (optional)</label><input type="text" id="terrNotes" placeholder="Streets, start point, anything to know"></div>
+      <div class="btn-row"><button class="small-btn go" id="terrSaveBtn" type="button">Save Territory</button><button class="small-btn" id="terrFormCancel" type="button">Cancel</button><button class="small-btn del" id="terrDeleteBtn" type="button" hidden>Delete</button></div>
+    </div>
+    <div id="terrList" style="margin-bottom:22px;"></div>
+
     <p class="section-label">Storm &amp; Outage Reports</p>
     <div class="storm-links">
       <button class="storm-link" onclick="openInApp('https://www.weather.gov/lot/','NWS Storm Reports')"><span class="sl-icon">🌩️</span><span class="sl-label">NWS Storm Reports</span></button>
@@ -695,6 +741,8 @@
         <option>Scheduled</option>
         <option>In Progress</option>
         <option>Completed</option>
+        <option value="tree">🌳 Has tree work</option>
+        <option value="stump">🪵 Has stump work</option>
       </select>
     </div>
     <button class="manage-btn" id="manageToggleJobs">+ Add Job</button>
@@ -706,6 +754,7 @@
           <select id="jStatus"><option>Scheduled</option><option>In Progress</option><option>Completed</option></select>
         </div>
       </div>
+      <div class="field"><label>Work</label><select id="jWork"><option>Tree removal</option><option>Stump grinding</option><option>Tree + stump</option><option>Limbs / cleanup</option><option>Other</option></select></div>
       <div class="field"><label>Address</label><input type="text" id="jAddress" placeholder="Street, City, State"></div>
       <div class="field"><label>Crew Assigned</label><input type="text" id="jCrew" placeholder="e.g. Brandon's crew"></div>
       <div class="field"><label>Hazards on Site</label><input type="text" id="jHazards" placeholder="e.g. line down near driveway, leave blank if none"></div>
@@ -861,6 +910,35 @@
   </div>
 
   <!-- SAFETY VIEW -->
+  <div class="view" id="view-affected">
+    <p class="section-label">Affected Areas</p>
+    <p class="hint">Shows where storm damage and outages are piling up, and where the strongest gusts hit, around the working area.</p>
+    <div class="btn-row" style="margin-bottom:8px;">
+      <select id="affRadius" class="small-btn" aria-label="Distance"><option value="10">10 mi</option><option value="25" selected>25 mi</option><option value="50">50 mi</option></select>
+      <select id="affHours" class="small-btn" aria-label="Time"><option value="24">Last 24 hrs</option><option value="72" selected>Last 3 days</option><option value="168">Last 7 days</option></select>
+      <button class="small-btn go" id="affLoadBtn" type="button">Refresh</button>
+    </div>
+    <div class="aff-toggles">
+      <label class="aff-tg on"><input type="checkbox" id="affShowOut" checked> ⚡ Outage / damage</label>
+      <label class="aff-tg on"><input type="checkbox" id="affShowGust" checked> 💨 High gusts</label>
+      <label class="aff-tg on"><input type="checkbox" id="affShowZones" checked> 🗺️ Our zones &amp; pins</label>
+    </div>
+    <div class="status-line" id="affStatus">Load an area on the Here tab, then tap Refresh.</div>
+    <div id="affMap" class="aff-map"></div>
+    <div class="aff-legend">
+      <div><span class="sw" style="background:#ffd23f"></span>Some reports <span class="sw" style="background:#ff8c1a"></span>Many <span class="sw" style="background:#e5242b"></span>Hardest hit</div>
+      <div><span class="dot" style="background:#9aa1a8"></span>Gust under 40 <span class="dot" style="background:#ff8c1a"></span>40 to 57 mph <span class="dot" style="background:#e5242b"></span>58+ mph (severe)</div>
+    </div>
+    <p class="section-label" style="margin-top:14px;">Hardest Hit Spots</p>
+    <div id="affList"></div>
+    <details class="aff-about">
+      <summary>What the highlighting is based on</summary>
+      <p>Orange and red squares come from damage reports sent to the National Weather Service in that time window: downed power lines and poles count most, then tornadoes and survey damage points, then trees and wind damage. Your own Outage and Hardest Hit zones are drawn on top.</p>
+      <p>Gust dots are measured gusts: NWS storm reports plus today's peak gust at each weather station near you.</p>
+      <p>There is no free live feed of utility outage counts, so this shows where outages are most likely, not the exact count. For exact numbers, use the utility outage map link below the list.</p>
+    </details>
+  </div>
+
   <div class="view" id="view-safety">
     <p class="section-label">Emergency &amp; Utility Numbers</p>
     <div class="card"><div class="card-body"><div class="card-name">911 — Life-threatening emergency</div><div class="card-sub">Fire, medical, immediate danger</div></div><div class="card-actions"><a class="icon-btn call" href="tel:911">📞</a></div></div>
@@ -959,7 +1037,7 @@
   <div id="sheetMarkFields">
     <div class="sheet-place" id="sheetPlace"></div>
     <div class="field"><label for="mkType">Flag</label>
-      <select id="mkType"><option value="tree">🌳 Tree down</option><option value="stay">⛔ Stay away</option><option value="note">📷 Photo / note</option><option value="done">✅ Work done</option></select>
+      <select id="mkType"><option value="tree">🌳 Tree down</option><option value="stump">🪵 Stump</option><option value="road">🚧 Road closed</option><option value="stay">⛔ Stay away</option><option value="note">📷 Photo / note</option><option value="done">✅ Work done</option></select>
     </div>
     <div class="field"><label for="mkNote">What's going on</label><textarea id="mkNote" placeholder="e.g. Large oak on garage, owner home. / Aggressive dog, owner said no."></textarea></div>
     <div class="field"><label for="mkBy">Your name</label><input type="text" id="mkBy" placeholder="So the crew knows who flagged it"></div>
@@ -1152,6 +1230,8 @@ document.querySelectorAll('.tab').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'here' && miniMaps.hereMiniMap) setTimeout(()=>miniMaps.hereMiniMap.invalidateSize(), 50);
+    if(btn.dataset.tab === 'affected') openAffected();
+    if(btn.dataset.tab === 'sales') openSalesMap();
     if(btn.dataset.tab === 'map'){ initMap(); setTimeout(()=>{ if(leafletMap) leafletMap.invalidateSize(); }, 50); startMyDot(); }
   });
 });
@@ -1269,6 +1349,7 @@ async function loadAll(){
   properties= await getJSON('properties', []);
   marks     = await getJSON('marks', []);
   zones     = await getJSON('zones', []);
+  territories = await getJSON('territories', []);
   areas     = await getJSON('areas', []);
   currentAreaId = await getJSON('currentArea', null);
   await loadCustomCounties();
@@ -1295,6 +1376,7 @@ async function saveIcs213(){ await setJSON('ics213', ics213); }
 async function saveProperties(){ await setJSON('properties', properties); }
 async function saveMarks(){ await setJSON('marks', marks); }
 async function saveZones(){ await setJSON('zones', zones); }
+async function saveTerritories(){ await setJSON('territories', territories); }
 async function saveAreas(){ await setJSON('areas', areas); await setJSON('currentArea', currentAreaId); }
 
 // Deletes get a few seconds to undo — a fat-fingered × in the field
@@ -1706,8 +1788,12 @@ document.getElementById('gAddBtn').addEventListener('click', async ()=>{
   const c = { id:'g_'+Date.now(), type: v('gType'), city: v('gCity'), county: v('gCounty'), role: v('gRole'), name: v('gName'), phone: v('gPhone'), email: v('gEmail'), notes: v('gNotes'), added: Date.now() };
   if(!c.name && !c.role){ status.textContent = 'Enter a name or a role.'; return; }
   const a = currentArea();
-  if(a){ if(!c.city) c.city = a.town; if(!c.county) c.county = a.county; c.state = a.stateCode || a.state; }
-  officials.push(c);
+  if(a){ if(!c.city) c.city = bareTown(a.town); if(!c.county) c.county = a.county; c.state = a.stateCode || a.state; }
+  if(editingOfficialId){
+    const old = officials.find(o=>o.id === editingOfficialId);
+    if(old){ Object.assign(old, c, { id: old.id, added: old.added, updated: Date.now() }); }
+    editingOfficialId = null; document.getElementById('gAddBtn').textContent = 'Save Contact';
+  }else officials.push(c);
   await saveOfficials();
   ['gCity','gCounty','gRole','gName','gPhone','gEmail','gNotes'].forEach(id=>document.getElementById(id).value='');
   status.textContent = 'Saved ' + (c.name || c.role) + '.';
@@ -1730,6 +1816,7 @@ function contactRow(c, opts = {}){
       </div>
       <div class="card-actions">
         ${telUrl ? `<a class="icon-btn call" href="${telUrl}" aria-label="Call">📞</a>` : ''}
+        ${opts.edit || !opts.noDelete ? `<button class="icon-btn" onclick="editOfficial('${c.id}')" aria-label="Edit">✏️</button>` : ''}
         ${opts.noDelete ? '' : `<button class="icon-btn del" onclick="deleteOfficial('${c.id}')" aria-label="Delete">×</button>`}
       </div>
     </div>`;
@@ -2782,6 +2869,7 @@ async function onMapClick(e){
     ${body}
     <div class="popup-links">
       <a href="#" onclick="openMarkSheet('tree'); return false;">🌳 Flag: tree down</a>
+      <a href="#" onclick="openMarkSheet('stump'); return false;">🪵 Flag: stump</a>
       <a href="#" onclick="openMarkSheet('stay'); return false;">⛔ Flag: stay away</a>
       <a href="#" onclick="openMarkSheet('note'); return false;">📷 Add photo / note</a>
       ${rows.length ? `<a href="#" onclick="saveLastOwner(); return false;">💾 Save to property log</a>` : ''}
@@ -2803,11 +2891,12 @@ document.getElementById('jAddBtn').addEventListener('click', async ()=>{
   const crew = document.getElementById('jCrew').value.trim();
   const hazardsNote = document.getElementById('jHazards').value.trim();
   const notes = document.getElementById('jNotes').value.trim();
+  const work = document.getElementById('jWork').value;
   const gStatus = document.getElementById('jGeoStatus');
   if(!number || !address){ gStatus.textContent = 'Job number and address are required.'; return; }
   gStatus.textContent = 'Saving…';
   const loc = await safeGeocode(address);
-  jobs.push({ id:'j_'+Date.now(), number, status, address, crew, hazardsNote, notes, lat: loc?loc.lat:null, lng: loc?loc.lng:null, pendingGeo: !loc });
+  jobs.push({ id:'j_'+Date.now(), number, status, work, address, crew, hazardsNote, notes, lat: loc?loc.lat:null, lng: loc?loc.lng:null, pendingGeo: !loc });
   await saveJobs();
   document.getElementById('jNumber').value=''; document.getElementById('jAddress').value='';
   document.getElementById('jCrew').value=''; document.getElementById('jHazards').value=''; document.getElementById('jNotes').value='';
@@ -2825,7 +2914,7 @@ function renderJobs(){
   const results = document.getElementById('jobsResults');
   const filter = document.getElementById('jobFilter').value;
   let list = jobs.slice();
-  if(filter){ list = list.filter(j=>j.status===filter); }
+  if(filter){ list = list.filter(j=> j.status === filter || (filter === 'stump' && /stump/i.test(j.work || '')) || (filter === 'tree' && /tree/i.test(j.work || ''))); }
   if(!list.length){
     results.innerHTML = `<div class="empty-state">${jobs.length ? 'No jobs match that status.' : 'No jobs on the board yet.<br>Tap "+ Add Job" to log the first one.'}</div>`;
     return;
@@ -2838,7 +2927,7 @@ function renderJobs(){
       <div class="card">
         <div class="card-body">
           <div class="card-name">#${escapeHtml(j.number)} <span class="status-pill ${pillClass}" onclick="cycleJobStatus('${j.id}')" style="cursor:pointer;">${j.status}</span>${j.hazardsNote ? ' ⚠️' : ''}</div>
-          <div class="card-sub">${escapeHtml(j.address)}${j.crew ? ' · '+escapeHtml(j.crew) : ''}</div>
+          <div class="card-sub">${j.work ? (/stump/i.test(j.work) ? '🪵 ' : '🌳 ') + escapeHtml(j.work) + ' · ' : ''}${escapeHtml(j.address)}${j.crew ? ' · '+escapeHtml(j.crew) : ''}</div>
           ${j.hazardsNote ? `<div class="card-sub prio-High">Hazard: ${escapeHtml(j.hazardsNote)}</div>` : ''}
           ${j.notes ? `<div class="card-sub">${escapeHtml(j.notes)}</div>` : ''}
         </div>
@@ -2992,6 +3081,8 @@ function renderNeeds(){
 // lot outline, the whole lot is shaded; otherwise a circle marks the spot.
 const MARK_TYPES = {
   tree: { label:'Tree down',   icon:'🌳', color:'#ff9f40' },
+  stump:{ label:'Stump',       icon:'🪵', color:'#a0662b' },
+  road: { label:'Road closed', icon:'🚧', color:'#ffb000' },
   stay: { label:'Stay away',   icon:'⛔', color:'#ff3b3b' },
   note: { label:'Photo / note',icon:'📷', color:'#5cc8ff' },
   done: { label:'Work done',   icon:'✅', color:'#4cd27a' }
@@ -3330,7 +3421,7 @@ async function loadWeather(lat, lng){
     ]);
     const gusts = grid && grid.properties && grid.properties.windGust ? grid.properties.windGust.values || [] : [];
     const old = await getJSON(key, null);
-    const wx = { time: Date.now(),
+    const wx = { time: Date.now(), cwa: P.cwa || P.gridId || '',
       now: obs || (old && old.now) || null,
       periods: fc ? (fc.properties.periods || []).slice(0, 6).map(p=>({ name:p.name, temp:p.temperature, unit:p.temperatureUnit,
         wind:(p.windSpeed || '') + ' ' + (p.windDirection || ''), windSpeed:p.windSpeed || '', windDir:p.windDirection || '',
@@ -3437,6 +3528,455 @@ async function renderHereWeather(){
   const wx = a.weather || await getJSON('wx:' + a.lat.toFixed(2) + '_' + a.lng.toFixed(2), null);
   el.innerHTML = wx ? `<p class="section-label">Weather Here</p>${weatherHtml(wx)}` : '';
 }
+
+
+
+
+// ========== TOWN CONTACTS ==========
+// Who to talk to in the town itself, for any US town:
+//  - a hand-checked contact list when one has been researched (towns/*.json in this app)
+//  - Wikidata: the town's official website, main phone, and mayor (when listed)
+//  - the open map: village/city hall, public works, police, fire, building dept
+//  - one-tap searches of the town's own website for staff, public works, permits
+function townSlug(a){ return ((a.stateCode || '').toLowerCase() + '-' + (a.town || '').toLowerCase().replace(/^(village|city|town|borough) of /, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')); }
+function bareTown(t){ return (t || '').replace(/^(village|city|town|borough|township) of /i, '').trim(); }
+async function updateTown(area){
+  if(!area.town) return;
+  // hand-checked list, if one exists for this town
+  try{
+    const r = await withTimeout(fetch(`towns/${townSlug(area)}.json`, { cache:'no-store' }), 10000);
+    if(r.ok){ area.townPack = await r.json(); area.townPackTime = Date.now(); }
+    else if(r.status === 404){ area.townPack = null; }
+  }catch(e){}
+  if(area.townInfo && Date.now() - (area.townInfoTime || 0) < 7*86400000) return;
+  const info = await loadTownInfo(bareTown(area.town), area.lat, area.lng);
+  if(info){ area.townInfo = info; area.townInfoTime = Date.now(); }
+}
+async function loadTownInfo(town, lat, lng){
+  if(!town || !navigator.onLine) return null;
+  const t = town.replace(/["\\]/g, '');
+  const q = `SELECT ?town ?site ?phone ?email ?headLabel ?start ?pop ?dist WHERE {
+    SERVICE wikibase:around { ?town wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${lng} ${lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "12" . bd:serviceParam wikibase:distance ?dist . }
+    ?town rdfs:label ?lbl . FILTER(lang(?lbl) = "en" && (str(?lbl) = "${t}" || STRSTARTS(str(?lbl), "${t},")))
+    ?town wdt:P17 wd:Q30 .
+    OPTIONAL { ?town wdt:P856 ?site } OPTIONAL { ?town wdt:P1329 ?phone } OPTIONAL { ?town wdt:P968 ?email } OPTIONAL { ?town wdt:P1082 ?pop }
+    OPTIONAL { ?town p:P6 ?hs . ?hs ps:P6 ?head . OPTIONAL { ?hs pq:P580 ?start } FILTER NOT EXISTS { ?hs pq:P582 ?end } }
+    SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } ORDER BY ?dist DESC(?start) LIMIT 8`;
+  try{
+    const d = await fetchJSON('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q), { headers:{ 'Accept':'application/sparql-results+json' } }, 15000);
+    const rows = (d.results && d.results.bindings) || [];
+    if(!rows.length) return { site:'', phone:'', email:'', mayor:'', none:true };
+    const first = rows[0].town.value, mine = rows.filter(b=>b.town.value === first);
+    const v = k=> (mine.find(b=>b[k]) || {})[k];
+    const val = k=> v(k) ? v(k).value : '';
+    return { wd: first.split('/').pop(), site: val('site'), phone: val('phone').replace(/^tel:/, ''), email: val('email').replace(/^mailto:/, ''),
+      mayor: val('headLabel'), mayorSince: val('start') ? val('start').slice(0, 4) : '', pop: val('pop') ? Math.round(+val('pop')) : null };
+  }catch(e){ return null; }
+}
+const PACK_ICONS = { hall:'🏛️', mayor:'🎖️', admin:'🗂️', roads:'🚧', forestry:'🌳', building:'📝', police:'🚓', fire:'🚒', ema:'🆘', clerk:'📑', township:'🛣️', utility:'⚡', info:'ℹ️' };
+function siteSearch(host, terms){ return `https://duckduckgo.com/?q=${encodeURIComponent('site:' + host + ' ' + terms)}`; }
+function townSectionHtml(a){
+  if(!a || !a.town) return '';
+  const town = bareTown(a.town), st = a.stateCode || a.state || '';
+  const pack = a.townPack, info = a.townInfo || {};
+  const site = (pack && pack.web) || info.site || '';
+  let host = ''; try{ host = site ? new URL(site).host.replace(/^www\./, '') : ''; }catch(e){}
+  let rows = '';
+  if(pack && pack.contacts && pack.contacts.length){
+    rows += `<div class="hint" style="margin:0 0 8px;">✅ Checked by hand on ${escapeHtml(pack.checked || '')}. ${escapeHtml(pack.summary || '')}</div>`;
+    rows += pack.contacts.map(c=> phoneRow(c.name, [c.person, c.hours, c.notes, c.address].filter(Boolean).join(' · '), c.phone, PACK_ICONS[c.group] || '📞', c.web || c.source)).join('');
+    if(pack.notFound) rows += `<div class="hint" style="margin:6px 0;">${escapeHtml(pack.notFound)}</div>`;
+  }else{
+    const offices = (a.offices || []).filter(o=> o.dist <= 5 || new RegExp('\\b' + town.replace(/[.*+?^${}()|[\]\\]/g, '') + '\\b', 'i').test(o.name + ' ' + o.address));
+    const pick = (g, n = 1)=> offices.filter(o=>o.group === g).slice(0, n);
+    const hall = pick('hall')[0];
+    rows += hall ? phoneRow(hall.name, (hall.address || 'Town hall') + ' · ' + hall.dist.toFixed(1) + ' mi', hall.phone || info.phone, '🏛️', hall.web || site)
+      : phoneRow(`${town} town / village hall`, info.phone ? 'Main number from Wikidata' : 'Not in the open map data. Use the website button below for the main number.', info.phone, '🏛️', site);
+    if(info.mayor) rows += phoneRow(`Mayor / village president: ${info.mayor}`, `From Wikidata${info.mayorSince ? ', in office since ' + info.mayorSince : ''}. It can be out of date, so confirm with the town hall.`, '', '🎖️', '');
+    [['roads', 2], ['building', 1], ['police', 1], ['fire', 1], ['ema', 1]].forEach(([g, n])=> pick(g, n).forEach(o=>{
+      const G = OFFICE_GROUPS.find(x=>x.key === g);
+      rows += phoneRow(o.name, (o.address || G.label) + ' · ' + o.dist.toFixed(1) + ' mi' + (o.phone ? '' : ' · no phone in map data'), o.phone, G.icon, o.web);
+    }));
+    if(!pick('roads').length) rows += searchRow(`${town} Public Works / Streets`, 'Trees on village streets and parkways, brush and storm debris pickup', `${town} ${st} public works phone`, '🚧');
+    if(!pick('building').length) rows += searchRow(`${town} Building / Permits`, 'Contractor registration, tree removal or right-of-way permits', `${town} ${st} contractor registration tree removal permit`, '📝');
+    if(!pick('police').length) rows += searchRow(`${town} Police non-emergency`, 'Trees blocking roads, traffic control', `${town} ${st} police non emergency number`, '🚓');
+  }
+  const links = host ? `<div class="btn-row town-links">
+      <a class="small-btn go" href="${escapeHtml(site)}" target="_blank" rel="noopener">🌐 Town website</a>
+      <a class="small-btn" href="${siteSearch(host, 'staff directory')}" target="_blank" rel="noopener">👥 Staff directory</a>
+      <a class="small-btn" href="${siteSearch(host, 'public works')}" target="_blank" rel="noopener">🚧 Public works</a>
+      <a class="small-btn" href="${siteSearch(host, 'contractor registration permit')}" target="_blank" rel="noopener">📝 Permits</a>
+      <a class="small-btn" href="${siteSearch(host, 'storm debris')}" target="_blank" rel="noopener">🌪️ Storm updates</a></div>`
+    : `<div class="btn-row town-links"><a class="small-btn" href="https://www.google.com/search?q=${encodeURIComponent(town + ' ' + st + ' official village city website')}" target="_blank" rel="noopener">🌐 Find the town website</a></div>`;
+  const mine = officials.filter(o=> bareTown(o.city).toLowerCase() === town.toLowerCase());
+  return `<div class="call-group town-group"><h3>${escapeHtml(town)}: Who to Talk To</h3>
+    ${mine.length ? mine.map(c=>contactRow(c, { noDelete:true, edit:true })).join('') : ''}
+    ${rows}${links}
+    <button class="small-btn" style="display:block; width:100%; margin-top:6px;" onclick="addTownContact()">+ Add a ${escapeHtml(town)} contact</button>
+    <div class="fresh" style="margin-top:6px;">${pack ? 'Checked list' : 'Open map + Wikidata'}${a.townInfoTime ? ' · updated ' + timeAgo(a.townInfoTime) : ''}</div></div>`;
+}
+function addTownContact(){
+  document.querySelector('.tab[data-tab="contacts"]').click();
+  const a = currentArea(), p = document.getElementById('managePanelGov'), b = document.getElementById('manageToggleGov');
+  editingOfficialId = null; document.getElementById('gAddBtn').textContent = 'Save Contact';
+  if(!p.classList.contains('open')) b.click();
+  if(a){ document.getElementById('gCity').value = bareTown(a.town); document.getElementById('gCounty').value = a.county || ''; }
+  document.getElementById('gType').value = 'City / Village Hall';
+  p.scrollIntoView({ behavior:'smooth', block:'start' });
+  setTimeout(()=>document.getElementById('gRole').focus(), 300);
+}
+let editingOfficialId = null;
+function editOfficial(id){
+  const c = officials.find(o=>o.id === id); if(!c) return;
+  document.querySelector('.tab[data-tab="contacts"]').click();
+  const p = document.getElementById('managePanelGov'), b = document.getElementById('manageToggleGov');
+  if(!p.classList.contains('open')) b.click();
+  editingOfficialId = id;
+  [['gType','type'],['gCity','city'],['gCounty','county'],['gRole','role'],['gName','name'],['gPhone','phone'],['gEmail','email'],['gNotes','notes']].forEach(([el, k])=> document.getElementById(el).value = c[k] || '');
+  document.getElementById('gAddBtn').textContent = 'Update Contact';
+  p.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ========== SALES TERRITORIES ==========
+// Drawn on the Sales tab's own map. Each salesperson gets one color across
+// all their areas; leads inside each territory are counted.
+let territories = [], salesMap = null, salesLayers = null, terrDraft = null, terrDraftLayer = null, terrEditId = null, salesSat = false, salesBase = {};
+const REP_COLORS = ['#ff7a1a','#2f80ed','#27ae60','#9b51e0','#e5242b','#00b8a9','#f2c94c','#d35400','#ff4fa3','#5d6d7e'];
+function repColor(rep){
+  const reps = [...new Set(territories.map(t=>t.rep || '').filter(Boolean))];
+  const i = reps.indexOf(rep);
+  return REP_COLORS[(i < 0 ? reps.length : i) % REP_COLORS.length];
+}
+function openSalesMap(){
+  if(typeof L === 'undefined'){ setStatus('terrStatus', 'The map needs signal the first time it loads.', 'warn'); renderTerritories(); return; }
+  if(!salesMap){
+    const c = (userLoc && !userLoc.approx) ? userLoc : currentArea();
+    salesMap = L.map('salesMap').setView(c ? [c.lat, c.lng] : [40.5, -89], c ? 15 : 6);
+    const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+    salesBase.streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' }).addTo(salesMap);
+    salesBase.sat = L.layerGroup([L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagery &copy; Esri' }), L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 })]);
+    salesLayers = L.layerGroup().addTo(salesMap);
+    salesMap.on('click', e=>{ if(terrDraft) addTerrPoint(e.latlng.lat, e.latlng.lng); });
+  }
+  setTimeout(()=>salesMap.invalidateSize(), 60);
+  drawTerritories(); renderTerritories();
+}
+document.getElementById('terrSatBtn').addEventListener('click', ()=>{
+  if(!salesMap) return;
+  salesSat = !salesSat;
+  salesMap.removeLayer(salesSat ? salesBase.streets : salesBase.sat); (salesSat ? salesBase.sat : salesBase.streets).addTo(salesMap);
+  document.getElementById('terrSatBtn').textContent = salesSat ? '🗺️ Streets' : '🛰️ Satellite';
+});
+function terrDrawUi(on){
+  document.getElementById('terrDrawBtn').hidden = on;
+  ['terrUndoBtn','terrFinishBtn','terrCancelBtn'].forEach(id=> document.getElementById(id).hidden = !on);
+}
+function addTerrPoint(lat, lng){
+  terrDraft.push([lat, lng]);
+  if(terrDraftLayer) salesMap.removeLayer(terrDraftLayer);
+  terrDraftLayer = (terrDraft.length > 2 ? L.polygon(terrDraft, { color:'#ffd166', weight:3, dashArray:'4 4', fillOpacity:.15 }) : L.polyline(terrDraft, { color:'#ffd166', weight:3 })).addTo(salesMap);
+  setStatus('terrStatus', `${terrDraft.length} corner${terrDraft.length > 1 ? 's' : ''}. ${terrDraft.length < 3 ? 'Need at least 3.' : 'Tap Finish when it covers the area.'}`);
+}
+function cancelTerrDraft(){ terrDraft = null; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } terrDrawUi(false); setStatus('terrStatus', ''); }
+document.getElementById('terrDrawBtn').addEventListener('click', ()=>{
+  if(!salesMap) openSalesMap(); if(!salesMap) return;
+  terrDraft = []; terrDrawUi(true); document.getElementById('terrForm').hidden = true;
+  setStatus('terrStatus', 'Tap the corners of the territory on the map.');
+  document.getElementById('salesMap').scrollIntoView({ behavior:'smooth', block:'center' });
+});
+document.getElementById('terrUndoBtn').addEventListener('click', ()=>{ if(!terrDraft || !terrDraft.length) return; const p = terrDraft.slice(0, -1); terrDraft = []; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } p.forEach(([a,b])=>addTerrPoint(a, b)); });
+document.getElementById('terrCancelBtn').addEventListener('click', cancelTerrDraft);
+function fillRepNames(){
+  const names = new Set(territories.map(t=>t.rep).concat(roster.map(r=>r.name)).filter(Boolean));
+  if(!names.size) ['Sales 1','Sales 2','Sales 3'].forEach(n=>names.add(n));
+  document.getElementById('terrReps').innerHTML = [...names].map(n=>`<option value="${escapeHtml(n)}"></option>`).join('');
+}
+function openTerrForm(t){
+  terrEditId = t ? t.id : null;
+  document.getElementById('terrName').value = t ? t.name : 'Territory ' + (territories.length + 1);
+  document.getElementById('terrRep').value = t ? (t.rep || '') : 'Sales ' + (new Set(territories.map(x=>x.rep)).size + 1);
+  document.getElementById('terrNotes').value = t ? (t.notes || '') : '';
+  document.getElementById('terrDeleteBtn').hidden = !t;
+  fillRepNames();
+  const f = document.getElementById('terrForm'); f.hidden = false; f.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+document.getElementById('terrFinishBtn').addEventListener('click', ()=>{
+  if(!terrDraft || terrDraft.length < 3){ toast('Tap at least 3 corners.'); return; }
+  openTerrForm(null);
+});
+document.getElementById('terrFormCancel').addEventListener('click', ()=>{ document.getElementById('terrForm').hidden = true; if(!terrEditId) cancelTerrDraft(); terrEditId = null; });
+document.getElementById('terrSaveBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('terrName').value.trim() || 'Territory';
+  const rep = document.getElementById('terrRep').value.trim();
+  const notes = document.getElementById('terrNotes').value.trim();
+  if(terrEditId){
+    const t = territories.find(x=>x.id === terrEditId);
+    Object.assign(t, { name, rep, notes, updated: Date.now() });
+  }else{
+    territories.push({ id:'t_' + Date.now(), name, rep, notes, points: terrDraft.slice(), time: Date.now(), areaId: currentAreaId });
+    if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; }
+    terrDraft = null; terrDrawUi(false);
+  }
+  territories.forEach(t=> t.color = repColor(t.rep));
+  await saveTerritories();
+  document.getElementById('terrForm').hidden = true; terrEditId = null;
+  setStatus('terrStatus', `Saved ${name}${rep ? ' for ' + rep : ''}.`, 'ok');
+  drawTerritories(); renderTerritories();
+});
+document.getElementById('terrDeleteBtn').addEventListener('click', async ()=>{
+  const id = terrEditId; if(!id) return;
+  const undo = offerUndo('Territory', ()=>territories, v=>{ territories = v; }, async ()=>{ await saveTerritories(); drawTerritories(); renderTerritories(); });
+  territories = territories.filter(t=>t.id !== id);
+  await saveTerritories(); document.getElementById('terrForm').hidden = true; terrEditId = null;
+  drawTerritories(); renderTerritories(); undo();
+});
+function pointInPoly(lat, lng, pts){
+  let inside = false;
+  for(let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+    const [yi, xi] = pts[i], [yj, xj] = pts[j];
+    if(((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function leadsIn(t){ return leads.filter(l=> l.lat != null && pointInPoly(l.lat, l.lng, t.points)); }
+function drawTerritories(){
+  if(!salesMap) return;
+  salesLayers.clearLayers();
+  territories.forEach(t=>{
+    const col = t.color || repColor(t.rep);
+    L.polygon(t.points, { color: col, weight:3, fillColor: col, fillOpacity:.22 })
+      .bindTooltip(`${escapeHtml(t.rep || 'Unassigned')}: ${escapeHtml(t.name)}`, { permanent:true, direction:'center', className:'terr-lbl' })
+      .on('click', e=>{ if(terrDraft){ addTerrPoint(e.latlng.lat, e.latlng.lng); return; } openTerrForm(t); })
+      .addTo(salesLayers);
+  });
+  leads.filter(l=>l.lat != null).forEach(l=>{
+    L.circleMarker([l.lat, l.lng], { radius:6, color:'#fff', weight:2, fillColor:'#3e7cb1', fillOpacity:1 })
+      .bindPopup(`<div class="popup-title">${escapeHtml(l.name)}</div>${escapeHtml(l.address || '')}<br>${escapeHtml(l.status || '')}`).addTo(salesLayers);
+  });
+}
+function zoomTerritory(id){ const t = territories.find(x=>x.id === id); if(t && salesMap){ salesMap.fitBounds(L.latLngBounds(t.points), { padding:[20,20] }); document.getElementById('salesMap').scrollIntoView({ behavior:'smooth', block:'center' }); } }
+async function shareTerritories(){
+  const byRep = {};
+  territories.forEach(t=> (byRep[t.rep || 'Unassigned'] = byRep[t.rep || 'Unassigned'] || []).push(t));
+  const lines = Object.entries(byRep).map(([rep, ts])=> rep + ':\n' + ts.map(t=>{ const c = L.latLngBounds(t.points).getCenter(); return `  ${t.name}${t.notes ? ' (' + t.notes + ')' : ''} https://www.google.com/maps/search/?api=1&query=${c.lat.toFixed(5)},${c.lng.toFixed(5)}`; }).join('\n'));
+  const text = 'Sales territories' + (currentArea() ? ' · ' + currentArea().town : '') + '\n\n' + lines.join('\n\n');
+  try{ if(navigator.share){ await navigator.share({ title:'Sales territories', text }); return; } }catch(e){ if(e.name === 'AbortError') return; }
+  try{ await navigator.clipboard.writeText(text); toast('Copied. Paste it in a text to the crew.'); }catch(e){ toast('Could not copy on this phone.'); }
+}
+function renderTerritories(){
+  const el = document.getElementById('terrList'); if(!el) return;
+  if(!territories.length){ el.innerHTML = '<div class="cat-empty">No territories yet. Tap Draw Territory to make the first one.</div>'; return; }
+  const byRep = {};
+  territories.forEach(t=> (byRep[t.rep || 'Unassigned'] = byRep[t.rep || 'Unassigned'] || []).push(t));
+  el.innerHTML = Object.entries(byRep).map(([rep, ts])=>`<div class="terr-rep"><span class="terr-sw" style="background:${ts[0].color || repColor(rep)}; margin:0;"></span>${escapeHtml(rep)} · ${ts.length} area${ts.length > 1 ? 's' : ''}</div>` + ts.map(t=>{
+    const n = leadsIn(t).length;
+    return `<div class="card"><span class="terr-sw" style="background:${t.color || repColor(t.rep)}"></span>
+      <div class="card-body"><div class="card-name">${escapeHtml(t.name)}</div><div class="card-sub wrap">${n} lead${n === 1 ? '' : 's'} inside${t.notes ? ' · ' + escapeHtml(t.notes) : ''}</div></div>
+      <div class="card-actions"><button class="icon-btn" onclick="zoomTerritory('${t.id}')" aria-label="Show on map">🔍</button><button class="icon-btn" onclick="openTerrForm(territories.find(x=>x.id==='${t.id}'))" aria-label="Edit">✏️</button></div></div>`;
+  }).join('')).join('') + '<button class="small-btn" style="display:block; width:100%; margin-top:8px;" onclick="shareTerritories()">📤 Send territories to the crew</button>';
+}
+
+// ========== AFFECTED AREAS ==========
+// A heat grid of storm damage around the working area. No free feed of live
+// utility outage counts exists, so outages are estimated from what's reported
+// to the NWS (downed lines and poles weigh most), the NWS damage survey, and
+// the crew's own Outage / Hardest Hit zones. Gusts are measured: NWS storm
+// reports plus today's peak gust at nearby stations (Iowa Environmental Mesonet).
+let affMap = null, affLayers = {}, affData = null, affCells = [];
+function affCenter(){
+  const a = currentArea();
+  if(a) return { lat:a.lat, lng:a.lng, name: a.town || 'the working area' };
+  if(userLoc && !userLoc.approx) return { lat:userLoc.lat, lng:userLoc.lng, name:'you' };
+  return null;
+}
+function openAffected(){
+  if(typeof L === 'undefined'){ setStatus('affStatus', 'The map needs signal the first time it loads.', 'warn'); return; }
+  const c = affCenter();
+  if(!affMap){
+    affMap = L.map('affMap', { zoomControl:true }).setView(c ? [c.lat, c.lng] : [40.5, -89], c ? 11 : 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' }).addTo(affMap);
+    affLayers.out = L.layerGroup().addTo(affMap);
+    affLayers.gust = L.layerGroup().addTo(affMap);
+    affLayers.zones = L.layerGroup().addTo(affMap);
+    affLayers.me = L.layerGroup().addTo(affMap);
+    [['affShowOut','out'],['affShowGust','gust'],['affShowZones','zones']].forEach(([id,k])=>{
+      const cb = document.getElementById(id);
+      cb.addEventListener('change', ()=>{ cb.checked ? affMap.addLayer(affLayers[k]) : affMap.removeLayer(affLayers[k]); cb.parentElement.classList.toggle('on', cb.checked); });
+    });
+  }
+  setTimeout(()=>affMap.invalidateSize(), 60);
+  if(!c){ setStatus('affStatus', 'Load an area on the Here tab first so the app knows where to look.', 'warn'); return; }
+  const fresh = affData && affData.center && distMiles(affData.center.lat, affData.center.lng, c.lat, c.lng) < 2 && Date.now() - affData.time < 15*60000;
+  if(!fresh) loadAffected(); else drawAffected();
+}
+async function loadAffected(){
+  const c = affCenter(); if(!c) return;
+  const radius = +document.getElementById('affRadius').value, hours = +document.getElementById('affHours').value;
+  const key = `affected:${c.lat.toFixed(2)}_${c.lng.toFixed(2)}`;
+  if(!navigator.onLine){
+    affData = await getJSON(key, null);
+    if(affData){ drawAffected(); setStatus('affStatus', `No signal. Showing what was saved ${timeAgo(affData.time)}.`, 'warn'); }
+    else setStatus('affStatus', 'No signal and nothing saved for this area yet.', 'warn');
+    return;
+  }
+  setStatus('affStatus', 'Loading storm reports and gusts…');
+  const out = { time: Date.now(), center: c, radius, hours, lsr: [], stations: [], dat: [], failed: [] };
+  const inRange = (la, lo)=> distMiles(c.lat, c.lng, la, lo) <= radius;
+  try{
+    const d = await fetchJSON(`https://mesonet.agron.iastate.edu/geojson/lsr.geojson?states=${stormStates()}&hours=${hours}`, {}, 25000);
+    out.lsr = (d.features || []).filter(f=> f.geometry && inRange(f.geometry.coordinates[1], f.geometry.coordinates[0])).map(f=>({ lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0], ...pickProps(f.properties || {}) }));
+  }catch(e){ out.failed.push('storm reports'); }
+  // Station peak gusts today, by NWS office (falls back to the state's airports).
+  const a = currentArea();
+  const wx = a && (a.weather || await getJSON('wx:' + a.lat.toFixed(2) + '_' + a.lng.toFixed(2), null));
+  const urls = [];
+  if(wx && wx.cwa) urls.push(`https://mesonet.agron.iastate.edu/api/1/currents.json?wfo=${wx.cwa}`);
+  stormStates().split(',').slice(0, 3).forEach(st=> urls.push(`https://mesonet.agron.iastate.edu/api/1/currents.json?network=${st}_ASOS`));
+  const seen = new Set();
+  for(const u of urls){
+    try{
+      const d = await fetchJSON(u, {}, 20000);
+      (d.data || []).forEach(r=>{
+        const la = r.lat, lo = r.lon;
+        if(la == null || lo == null || seen.has(r.station) || !inRange(la, lo)) return;
+        const kt = Math.max(+r.max_gust || 0, +r.gust || 0, +r.max_sknt || 0);
+        if(!kt) return;
+        seen.add(r.station);
+        out.stations.push({ lat:la, lng:lo, name: r.name || r.station, mph: Math.round(kt * 1.151), at: r.max_gust_ts || r.local_valid || r.utc_valid || '' });
+      });
+    }catch(e){}
+  }
+  if(!out.stations.length) out.failed.push('station gusts');
+  const sl = await getJSON('stormLayers', null);
+  if(sl && sl.dat) out.dat = sl.dat.map(f=>({ lat:(f.geometry||{}).y, lng:(f.geometry||{}).x })).filter(p=> p.lat != null && inRange(p.lat, p.lng));
+  affData = out;
+  await setJSON(key, out);
+  drawAffected();
+}
+function pickProps(p){ return { type: p.typetext || p.type || '', mag: parseFloat(p.magnitude) || 0, unit: p.unit || '', remark: p.remark || '', city: p.city || '', valid: p.valid || '' }; }
+function reportWeight(r){
+  const t = r.type.toUpperCase(), rm = r.remark;
+  if(/power|line|pole|transformer|outage|utility|electric/i.test(rm) || /POWER/.test(t)) return { w:3, kind:'power' };
+  if(/TORNADO/.test(t)) return { w:3, kind:'tornado' };
+  if(/WND DMG|WIND DAMAGE|DMG/.test(t) || /tree|limb|branch|damage/i.test(rm)) return { w:1, kind:'tree' };
+  return null;
+}
+function isGustReport(r){ return /GST|GUST|HIGH SUST/i.test(r.type) && r.mag > 0; }
+function heatColor(f){ return f > .66 ? '#e5242b' : f > .33 ? '#ff8c1a' : '#ffd23f'; }
+function gustColor(m){ return m >= 58 ? '#e5242b' : m >= 40 ? '#ff8c1a' : '#9aa1a8'; }
+function bearingWord(c, la, lo){
+  const d = distMiles(c.lat, c.lng, la, lo);
+  if(d < 0.5) return 'In ' + c.name;
+  const y = Math.sin((lo - c.lng) * Math.PI/180) * Math.cos(la * Math.PI/180);
+  const x = Math.cos(c.lat*Math.PI/180)*Math.sin(la*Math.PI/180) - Math.sin(c.lat*Math.PI/180)*Math.cos(la*Math.PI/180)*Math.cos((lo-c.lng)*Math.PI/180);
+  const deg = (Math.atan2(y, x) * 180/Math.PI + 360) % 360;
+  return `${d.toFixed(1)} mi ${degToCompass(deg)} of ${c.name}`;
+}
+function drawAffected(){
+  if(!affMap || !affData) return;
+  const D = affData, c = D.center;
+  Object.values(affLayers).forEach(l=>l.clearLayers());
+  // grid of ~1.5 mi squares; each report also warms its 8 neighbors so
+  // clusters read as one highlighted area
+  const dLat = 0.022, dLng = 0.022 / Math.cos(c.lat * Math.PI/180);
+  const cells = new Map();
+  const cellOf = (la, lo)=> [Math.floor((la - c.lat) / dLat), Math.floor((lo - c.lng) / dLng)];
+  const cell = (i, j)=>{ const k = i + ',' + j; if(!cells.has(k)) cells.set(k, { i, j, heat:0, power:0, tree:0, tornado:0, dat:0, gust:0, reports:[] }); return cells.get(k); };
+  const add = (la, lo, w, kind, r)=>{
+    const [i, j] = cellOf(la, lo);
+    for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++) cell(i+di, j+dj).heat += (di || dj) ? w * .4 : w;
+    const home = cell(i, j); home[kind]++; home.pts = (home.pts || []).concat([[la, lo]]); if(r) home.reports.push(r);
+  };
+  D.lsr.forEach(r=>{ const rw = reportWeight(r); if(rw) add(r.lat, r.lng, rw.w, rw.kind, r); });
+  D.dat.forEach(p=> add(p.lat, p.lng, 2, 'dat'));
+  const gusts = D.lsr.filter(isGustReport).map(r=>({ lat:r.lat, lng:r.lng, mph: Math.round(r.unit === 'KT' ? r.mag * 1.151 : r.mag), name: r.city, src:'Storm report', at: r.valid, remark: r.remark }))
+    .concat(D.stations.map(s=>({ ...s, src:'Weather station (today\'s peak)' })));
+  gusts.forEach(g=>{ const [i, j] = cellOf(g.lat, g.lng); const h = cell(i, j); h.gust = Math.max(h.gust, g.mph); });
+  const max = Math.max(0, ...[...cells.values()].map(x=>x.heat));
+  [...cells.values()].forEach(x=>{
+    if(x.heat < .4) return;
+    const f = max ? x.heat / max : 0;
+    const la = c.lat + x.i * dLat, lo = c.lng + x.j * dLng;
+    L.rectangle([[la, lo], [la + dLat, lo + dLng]], { stroke:false, fillColor: heatColor(f), fillOpacity: .18 + f * .42, interactive: !!x.reports.length || x.dat > 0 })
+      .bindPopup(cellPopup(x)).addTo(affLayers.out);
+  });
+  gusts.forEach(g=>{
+    if(g.mph >= 40) L.circle([g.lat, g.lng], { radius: 6000, stroke:false, fillColor: gustColor(g.mph), fillOpacity:.13, interactive:false }).addTo(affLayers.gust);
+    L.circleMarker([g.lat, g.lng], { radius: g.mph >= 58 ? 11 : g.mph >= 40 ? 9 : 6, color:'#fff', weight:2, fillColor: gustColor(g.mph), fillOpacity:.95 })
+      .bindPopup(`<div class="popup-title">💨 ${g.mph} mph gust</div>${escapeHtml(g.name || '')}<br><small>${escapeHtml(g.src)}${g.at ? ' · ' + escapeHtml(String(g.at).replace('T',' ').slice(0,16)) : ''}</small>${g.remark ? '<br><i>' + escapeHtml(g.remark) + '</i>' : ''}`)
+      .bindTooltip(String(g.mph), { permanent:true, direction:'right', className:'gust-lbl', offset:[6,0] }).addTo(affLayers.gust);
+  });
+  marks.filter(m=> m.lat != null && (m.type === 'tree' || m.type === 'stump' || m.type === 'stay')).forEach(m=>{
+    const t = MARK_TYPES[m.type];
+    L.marker([m.lat, m.lng], { icon: L.divIcon({ className:'aff-pin', html: t.icon, iconSize:[24,24] }) })
+      .bindPopup(`<div class="popup-title">${t.icon} ${t.label}</div>${escapeHtml(m.address || '')}${m.note ? '<br>' + escapeHtml(m.note) : ''}`).addTo(affLayers.zones);
+  });
+  zones.filter(z=> z.kind === 'outage' || z.kind === 'hit').forEach(z=>{
+    L.polygon(z.points, { color: z.kind === 'outage' ? '#7b2ff7' : '#ff2d55', weight:3, dashArray:'6 4', fillOpacity:.15 })
+      .bindTooltip(`${z.kind === 'outage' ? '⚡' : '🌪️'} ${escapeHtml(z.name)}`, { direction:'center' }).addTo(affLayers.zones);
+  });
+  L.circleMarker([c.lat, c.lng], { radius:7, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).bindPopup(escapeHtml(c.name)).addTo(affLayers.me);
+  L.circle([c.lat, c.lng], { radius: D.radius * 1609, color:'#2f80ed', weight:1, dashArray:'4 6', fill:false, interactive:false }).addTo(affLayers.me);
+
+  // rank: cells with their own reports, by heat
+  affCells = [...cells.values()].filter(x=> x.power + x.tree + x.tornado + x.dat > 0).sort((a,b)=>b.heat - a.heat);
+  // drop spots right next to a higher-ranked one so the list isn't one cluster repeated
+  // and roll each spot's neighbors into it, so counts cover the whole cluster
+  const picked = [];
+  affCells.forEach(x=>{ if(picked.length < 8 && !picked.some(p=> Math.abs(p.i - x.i) <= 2 && Math.abs(p.j - x.j) <= 2)) picked.push(x); });
+  affCells = picked.map(x=>{
+    const sum = { i:x.i, j:x.j, heat:x.heat, power:0, tree:0, tornado:0, dat:0, pts:[] };
+    for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++){
+      const y = cells.get((x.i+di) + ',' + (x.j+dj)); if(!y) continue;
+      ['power','tree','tornado','dat'].forEach(k=> sum[k] += y[k]); sum.pts.push(...(y.pts || []));
+    }
+    sum.lat = sum.pts.reduce((t,p)=>t+p[0], 0) / sum.pts.length; sum.lng = sum.pts.reduce((t,p)=>t+p[1], 0) / sum.pts.length;
+    return sum;
+  });
+  const nearGust = x=> Math.max(0, ...gusts.filter(g=>{ const [i,j] = cellOf(g.lat, g.lng); return Math.abs(i - x.i) <= 3 && Math.abs(j - x.j) <= 3; }).map(g=>g.mph));
+  const util = (currentArea() && currentArea().utility || [])[0];
+  const om = util ? outageMapFor(util.name) : '';
+  document.getElementById('affList').innerHTML = (affCells.length ? affCells.map((x, n)=>{
+    const la = x.lat, lo = x.lng, g = nearGust(x);
+    const bits = [x.power && `${x.power} power line report${x.power > 1 ? 's' : ''}`, x.tornado && `${x.tornado} tornado`, x.tree && `${x.tree} tree / wind damage`, x.dat && `${x.dat} damage survey point${x.dat > 1 ? 's' : ''}`].filter(Boolean).join(', ');
+    return `<div class="card">
+      <div class="aff-rank">${n + 1}</div>
+      <div class="card-body">
+        <div class="card-name">${escapeHtml(bearingWord(c, la, lo))}</div>
+        <div class="card-sub wrap">${bits}${g ? ` · gusts to ${g} mph nearby` : ''}</div>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn" onclick="affZoom(${n})" aria-label="Show on map">🔍</button>
+        <button class="icon-btn" onclick="affMakeZone(${n})" aria-label="Make outage zone">⚡</button>
+      </div></div>`;
+  }).join('') : `<div class="cat-empty">No damage or downed-line reports within ${D.radius} miles in this time window.${gusts.length ? '' : ' No gust readings either.'} Try a longer time or wider distance.</div>`)
+  + (om ? `<a class="small-btn" style="display:block; margin-top:8px;" href="${om}" target="_blank" rel="noopener">⚡ ${escapeHtml(util.name)} live outage map</a>` : '');
+  const nOut = D.lsr.filter(r=>reportWeight(r)).length + D.dat.length, top = Math.max(0, ...gusts.map(g=>g.mph));
+  setStatus('affStatus', `${nOut} damage report${nOut === 1 ? '' : 's'} and ${gusts.length} gust reading${gusts.length === 1 ? '' : 's'} within ${D.radius} mi${top ? `, highest gust ${top} mph` : ''}. Updated ${timeAgo(D.time)}.${D.failed.length ? ' Couldn\'t load: ' + D.failed.join(', ') + '.' : ''}`, D.failed.length ? 'warn' : 'ok');
+  affMap._affGrid = { dLat, dLng, c };
+  if(!affMap._fitted){ affMap.setView([c.lat, c.lng], D.radius <= 10 ? 12 : D.radius <= 25 ? 10 : 9); affMap._fitted = true; }
+}
+function cellPopup(x){
+  const lines = x.reports.slice(0, 6).map(r=>`<div style="font-size:12px; margin-top:4px;"><b>${escapeHtml(r.type)}</b>${r.city ? ' · ' + escapeHtml(r.city) : ''}<br>${escapeHtml(r.remark || '')}</div>`).join('');
+  return `<div class="popup-title">${x.power ? '⚡ Likely outages' : 'Storm damage'}</div>${lines}${x.reports.length > 6 ? `<div style="font-size:11px;">+${x.reports.length - 6} more</div>` : ''}${x.dat ? `<div style="font-size:12px;">${x.dat} NWS damage survey point(s)</div>` : ''}`;
+}
+function affSpotBounds(n){
+  const x = affCells[n], G = affMap && affMap._affGrid; if(!x || !G) return null;
+  const la = G.c.lat + x.i * G.dLat, lo = G.c.lng + x.j * G.dLng;
+  return [[la - G.dLat, lo - G.dLng], [la + 2*G.dLat, lo + 2*G.dLng]];
+}
+function affZoom(n){ const b = affSpotBounds(n); if(b){ affMap.fitBounds(b); document.getElementById('affMap').scrollIntoView({ behavior:'smooth', block:'center' }); } }
+async function affMakeZone(n){
+  const b = affSpotBounds(n); if(!b) return;
+  const [[s0, w0], [n0, e0]] = b;
+  const c = affData.center;
+  zones.push({ id:'z_' + Date.now(), name: 'Outage ' + bearingWord(c, affCells[n].lat, affCells[n].lng), worker:'', notes:'Made from Affected Areas', kind:'outage', color:'#8a8a8a', status:'Not started',
+    points: [[s0, w0], [s0, e0], [n0, e0], [n0, w0]], time: Date.now(), areaId: currentAreaId });
+  await saveZones(); renderZones(); if(leafletMap) refreshMapMarkers(); drawAffected();
+  toast('Outage zone added. Assign a worker to it on the Map tab.');
+}
+document.getElementById('affLoadBtn').addEventListener('click', ()=>{ if(affMap) affMap._fitted = false; loadAffected(); });
+['affRadius','affHours'].forEach(id=> document.getElementById(id).addEventListener('change', ()=>{ if(affMap) affMap._fitted = false; loadAffected(); }));
 
 // ========== COUNTY INFO (Wikidata, free) ==========
 // The county government's official website, phone (where listed) and county
@@ -3650,6 +4190,9 @@ async function refreshArea(area, opts = {}){
     setStatus('hereStatus', `Updating ${name}: local offices…`);
     await updateOffices(area);
     await saveAreas(); renderHere(); renderContacts();
+    setStatus('hereStatus', `Updating ${name}: town officials…`);
+    try{ await updateTown(area); }catch(e){}
+    await saveAreas(); renderHere(); renderContacts();
 
     setStatus('hereStatus', `Updating ${name}: weather…`);
     try{ const wx = await loadWeather(area.lat, area.lng); if(wx) area.weather = wx; }catch(e){}
@@ -3698,6 +4241,7 @@ const OFFICE_GROUPS = [
   { key:'fire',    label:'Fire',                icon:'🚒' },
   { key:'assess',  label:'Assessor / Clerk',    icon:'📑' },
   { key:'roads',   label:'Roads / Public Works',icon:'🚧' },
+  { key:'building',label:'Building / Permits',  icon:'📝' },
   { key:'ema',     label:'Emergency Mgmt',      icon:'🆘' },
   { key:'court',   label:'Courthouse',          icon:'⚖️' },
   { key:'gov',     label:'Other Gov Offices',   icon:'🏢' }
@@ -3706,7 +4250,8 @@ function officeGroupFor(t){
   const n = (t.name || '').toLowerCase();
   if(/emergency management|\bema\b|esda/.test(n) || t.emergency === 'emergency_management') return 'ema';
   if(/assess|treasur|recorder|clerk|tax|gis|zoning|planning/.test(n)) return 'assess';
-  if(/highway|road|street|public works|transport|\bdot\b|maintenance/.test(n)) return 'roads';
+  if(/building|permit|code enforcement|inspection|zoning/.test(n) && !/assess|treasur/.test(n)) return 'building';
+  if(/highway|road|street|public works|transport|\bdot\b|maintenance|forestry/.test(n)) return 'roads';
   if(t.amenity === 'townhall') return 'hall';
   if(t.amenity === 'police') return /sheriff/.test(n) ? 'sheriff' : 'police';
   if(t.amenity === 'fire_station') return 'fire';
@@ -4115,9 +4660,10 @@ function callListHtml(a){
   const co = a.county ? a.county + ' County' : 'county', st = a.state || '';
   const offices = a.offices || [];
   const nearest = g => offices.filter(o=>o.group===g).slice(0, 2);
-  let html = '';
-  const saved = savedContactsFor(a);
-  if(saved.length) html += `<div class="call-group"><h3>Your Saved Contacts Here</h3>${saved.map(c=>contactRow(c, { noDelete:true })).join('')}</div>`;
+  let html = townSectionHtml(a);
+  const town = bareTown(a.town).toLowerCase();
+  const saved = savedContactsFor(a).filter(c=> bareTown(c.city).toLowerCase() !== town);
+  if(saved.length) html += `<div class="call-group"><h3>Your Saved Contacts Nearby</h3>${saved.map(c=>contactRow(c, { noDelete:true, edit:true })).join('')}</div>`;
 
   let ut = (a.utility || []).map(u=> phoneRow(u.name, (u.outage ? 'Outages & downed lines: ' + u.outage : 'Electric utility for this spot') + (u.phone && u.phone !== u.outage ? ' · Office: ' + u.phone : ''), u.outage || u.phone, '⚡', u.web)).join('');
   if(!ut) ut = searchRow('Electric utility', 'Not identified yet. Search who serves ' + (a.town || 'this town') + '.', `electric utility serving ${a.town} ${st} outage phone`, '⚡');
@@ -4273,7 +4819,7 @@ function officesEmptyText(a){
   if(a.officesError) return 'The map servers didn\'t answer (' + escapeHtml(a.officesError) + '). They get busy after storms.' + retry;
   return 'Offices haven\'t loaded for this area yet.' + retry;
 }
-const GROUP_TO_TYPE = { hall:'City / Village Hall', sheriff:'Sheriff / Police', police:'Sheriff / Police', fire:'Other', assess:'County Assessor / GIS', roads:'County Highway / Roads', ema:'Emergency Mgmt (EMA)', court:'Other', gov:'Other' };
+const GROUP_TO_TYPE = { building:'Permits / Building', hall:'City / Village Hall', sheriff:'Sheriff / Police', police:'Sheriff / Police', fire:'Other', assess:'County Assessor / GIS', roads:'County Highway / Roads', ema:'Emergency Mgmt (EMA)', court:'Other', gov:'Other' };
 async function saveOffice(i){
   const a = currentArea(); if(!a) return;
   const o = (a.offices || [])[i]; if(!o) return;
@@ -4370,6 +4916,7 @@ function attachTownAutocomplete(inputId, listId, onPick){
   });
 }
 attachTownAutocomplete('hereTownInput', 'acListHere', pick=> arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }));
+attachTownAutocomplete('contactsTownInput', 'acListContacts', pick=>{ setStatus('hereStatus', 'Loading ' + pick.name + '…'); toast('Loading ' + pick.name + '. Contacts fill in as they arrive.'); arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }); });
 
 // ---------- backup / restore ----------
 document.getElementById('exportBtn').addEventListener('click', async ()=>{
