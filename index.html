@@ -2896,6 +2896,7 @@ async function onMapClick(e){
     <div class="popup-links">
       <a href="#" onclick="openMarkSheet('tree'); return false;">🌳 Flag: tree down</a>
       <a href="#" onclick="openMarkSheet('stump'); return false;">🪵 Flag: stump</a>
+      <a href="#" onclick="openMarkSheet('road'); return false;">🚧 Flag: road closed</a>
       <a href="#" onclick="openMarkSheet('stay'); return false;">⛔ Flag: stay away</a>
       <a href="#" onclick="openMarkSheet('note'); return false;">📷 Add photo / note</a>
       ${rows.length ? `<a href="#" onclick="saveLastOwner(); return false;">💾 Save to property log</a>` : ''}
@@ -3910,24 +3911,10 @@ document.getElementById('debRadius').addEventListener('change', loadDebris);
 // "Road closed" pins. Everywhere else, a link to the state's 511 site.
 const STATE_511 = { IL:'https://www.gettingaroundillinois.com/', IN:'https://511in.org/', IA:'https://511ia.org/', MO:'https://traveler.modot.org/', WI:'https://511wi.gov/',
   MI:'https://mdotjboss.state.mi.us/MiDrive/map', OH:'https://www.ohgo.com/', KY:'https://goky.ky.gov/', MN:'https://511mn.org/', TN:'https://smartway.tn.gov/' };
-// Checked 2026-10-18: free, no key, and open to browsers (CORS). MN, WI, KY and
-// MO publish free feeds too, but browsers are blocked from reading them.
-const iaDay = ()=> new Date().toISOString().slice(0,10).replace(/-/g, '');
-const ROAD_FEEDS = [
-  { states:['IL'], label:'IDOT road closures', kind:'arcgis', url:'https://services2.arcgis.com/aIrBD8yn1TDTEXoz/ArcGIS/rest/services/ClosureIncidents/FeatureServer/0',
-    text: p=> [p.ConstructionType || p.ClosureType, p.Location, p.NearTown, p.DetourRoute ? 'Detour: ' + p.DetourRoute : '', p.EndDate ? 'Until ' + new Date(p.EndDate).toLocaleDateString() : ''].filter(Boolean).join(' · '),
-    closed: p=> /closed/i.test((p.ConstructionType || '') + ' ' + (p.ClosureType || '')), road: p=> p.St_Name || '', skip: p=> p.EndDate && p.EndDate < Date.now() },
-  { states:['IA'], label:'Iowa 511', kind:'arcgis', url:'https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/CARS511_Iowa_View/FeatureServer/0',
-    text: p=> p.headline || p.msg0 || [p.Route, p.phrase, p.cause].filter(Boolean).join(' '), closed: p=> p.STYLE === 'closure' || /closed/i.test(p.phrase || ''), road: p=> p.Route || '',
-    skip: p=> p.ExpireDate && String(p.ExpireDate) < iaDay() },
-  { states:['IA'], label:'Iowa county roads', kind:'arcgis', url:'https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/511_IA_Counties_View/FeatureServer/0',
-    text: p=> [p.name, p.description, p.organization, p.organization_phone].filter(Boolean).join(' · '), closed: p=> /impassable|closed/i.test((p.subtype || '') + ' ' + (p.name || '')), road: p=> p.road || '' },
-  { states:['IN'], label:'INDOT', kind:'wzdx', url:'https://in.carsprogram.org/carsapi_v1/api/wzdx' },
-  { states:['ND'], label:'NDDOT', kind:'wzdx', url:'https://travelfiles.dot.nd.gov/geojson_nc/wzdx_geojson.json' },
-  { states:['NH','VT','ME'], label:'New England 511', kind:'wzdx', url:'https://api.dx.ne-compass.com/wzdx-latest/' },
-  { states:['MS'], label:'MDOT', kind:'wzdx', url:'https://api.mdottraffic.com/prod/v3/data/wzdx' },
-  { states:['NY'], label:'511NY', kind:'wzdx', url:'https://511ny.org/api/wzdx' }
-];
+// State DOT feeds (IDOT, Iowa 511, INDOT and others) mostly cover state
+// highways and planned work zones, not local streets, so they're left out;
+// the adapters below still work if one gets added back here.
+const ROAD_FEEDS = [];
 async function loadRoadClosures(c, radiusMi){
   const a = currentArea(), st = (a && a.stateCode) || '';
   const items = [], failed = [];
@@ -3989,7 +3976,7 @@ function drawRoads(D){
       <div class="card-body"><div class="card-name">${x.closed ? '⛔' : '🚧'} ${escapeHtml(x.road || (x.closed ? 'Road closed' : 'Work zone'))}</div>
         <div class="card-sub wrap">${escapeHtml(x.text || '')}</div><div class="fresh">${escapeHtml(x.src)}${x.time ? ' · ' + timeAgo(x.time) : ''}</div></div>
       ${x.area ? '' : `<div class="card-actions"><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lng}" target="_blank" rel="noopener" aria-label="Map">📍</a></div>`}</div>`).join('')
-    : `<div class="cat-empty">No closures reported near here${R.feeds ? '' : ' from the sources this app can read for ' + (st || 'this state')}. Mark one with 🚧 Road Closed Here on the Owner tab.</div>`)
+    : `<div class="cat-empty">No local closures marked yet. Mark one with 🚧 Road Closed Here on the Owner tab, or tap a spot on the Map tab.</div>`)
     + `<a class="small-btn" style="display:block; margin-top:8px;" href="${s511 || 'https://www.fhwa.dot.gov/trafficinfo/'}" target="_blank" rel="noopener">🛣️ ${s511 ? (st + ' 511 road conditions map') : 'State road conditions (511) sites'}</a>`;
 }
 
