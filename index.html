@@ -311,6 +311,9 @@
   .topbar{ top:env(safe-area-inset-top, 0px); padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
   main{ padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
   .hint{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px; line-height:1.5; }
+  .where-bar{ display:flex; align-items:center; gap:6px; width:100%; border:0; background:var(--accent); color:#fff; font-weight:700; font-size:14px; padding:7px 12px; border-radius:8px; margin:0 0 8px; text-align:left; cursor:pointer; }
+  .where-bar span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .where-bar.loading{ background:var(--text-dim); }
   .net-pill{ font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:10px; margin:0 0 12px; display:inline-flex; align-items:center; gap:5px; }
   .net-pill::before{ content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
   .net-pill.on{ background:var(--ok-bg); color:var(--ok-text); }
@@ -395,6 +398,12 @@
   .city-tot{ display:grid; grid-template-columns:1fr auto auto auto; gap:4px 10px; font-size:13px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:12px; }
   .city-tot b{ font-family:var(--font-mono); }
   .city-tot .h{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--text-dim); }
+  .gmap-box{ margin:10px 0 4px; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel); }
+  .gmap-head{ display:flex; align-items:center; gap:6px; padding:8px 10px; flex-wrap:wrap; }
+  .gmap-head b{ flex:1; font-size:14px; }
+  .gmap-box iframe{ display:block; width:100%; height:340px; border:0; }
+  .acc-chip{ background:#fff; color:#111; font-family:var(--font-mono); font-size:12px; font-weight:700; padding:5px 9px; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:default; }
+  .acc-chip.good{ color:#1b7f3b; } .acc-chip.ok{ color:#b26b00; } .acc-chip.bad{ color:#c62828; cursor:pointer; }
   .terr-sw{ width:16px; height:16px; border-radius:4px; flex:none; margin-right:10px; align-self:center; }
   .terr-rep{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin:10px 0 4px; display:flex; align-items:center; gap:6px; }
   .terr-lbl{ background:rgba(255,255,255,.85); border:0; border-radius:4px; font-weight:700; font-size:12px; color:#111; padding:2px 6px; box-shadow:none; }
@@ -511,6 +520,7 @@
       <button class="theme-btn" id="themeBtn" type="button" aria-label="Switch light or dark mode">☀</button>
     </div>
   </div>
+  <button class="where-bar" id="whereBar" type="button" onclick="document.querySelector('.tab[data-tab=\'here\']').click()">📍 <span id="whereText">No area loaded. Tap here, then I'm Here.</span></button>
   <div class="tabs">
     <button class="tab active" data-tab="here"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Here</span></button>
     <button class="tab" data-tab="contacts"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Contacts</span></button>
@@ -634,6 +644,7 @@
     <button class="locate-btn secondary" id="ownerAddrBtn" style="margin-bottom:8px;">Look Up This Address</button>
     <div class="status-line" id="ownerStatus">You can also tap any lot on the Map tab.</div>
     <div id="ownerResult"></div>
+    <div id="gmapBox"></div>
 
     <p class="section-label" style="margin-top:18px;">Flagged Properties</p>
     <p class="hint">Trees down, stay-away houses, and photo notes. Add one by tapping a lot on the Map tab, or flag the spot you're standing on.</p>
@@ -1338,9 +1349,10 @@ async function retryPendingGeocodes(){
 // the app opens. Wait for a real fix, then try a quicker rough fix, and only
 // fall back to a city-level guess from the internet address as a last resort.
 // opts.precise: don't accept the city-level guess (owner lookups need the lot).
+const PRECISE_TIP = 'Turn on Precise Location: iPhone Settings > Privacy & Security > Location Services > Safari Websites (or Storm Ops) > Precise Location. Android: Settings > Location > Google Location Accuracy. Being outside, away from buildings, helps too.';
 function getLocation(statusEl, onDone, opts = {}){
   const fallback = async (why)=>{
-    if(opts.precise){
+    if(true){ // the carrier/IP guess was often a different city (e.g. 'Chicago'), so it's never used
       statusEl.textContent = (why || 'GPS didn\'t answer.') + ' Check that location is allowed for this site in your phone settings, step outside, and tap again. Or type the address.';
       statusEl.className = 'status-line warn';
       return;
@@ -1375,8 +1387,15 @@ function getLocation(statusEl, onDone, opts = {}){
     if(!best){ fallback('GPS didn\'t get a fix.'); return; }
     const c = best.coords, ft = Math.round((c.accuracy || 0) * 3.28);
     userLoc = { lat: c.latitude, lng: c.longitude, acc: c.accuracy };
-    const weak = c.accuracy > 60;
-    statusEl.textContent = weak ? `Weak GPS fix (within about ${ft.toLocaleString()} ft), so the spot may be off. Tap the right house on the map below to fix it.` : `Location locked (within ${ft} ft).`;
+    if(c.accuracy > 1500 && !opts.allowCoarse){
+      statusEl.innerHTML = `Your phone is only giving a rough location (within about ${(c.accuracy / 1609).toFixed(1)} miles), so the app can't tell which town or house you're at. ${escapeHtml(PRECISE_TIP)} <button class="small-btn" id="coarseAnyway">Use it anyway</button>`;
+      statusEl.className = 'status-line warn';
+      const b = document.getElementById('coarseAnyway');
+      if(b) b.onclick = ()=>{ userLoc = { lat: c.latitude, lng: c.longitude, acc: c.accuracy, approx: true }; onDone(); };
+      return;
+    }
+    const weak = c.accuracy > 50;
+    statusEl.textContent = weak ? `Weak GPS fix (within about ${ft.toLocaleString()} ft), so the spot may be off. Tap the right house on the map below to fix it. ${PRECISE_TIP}` : `Location locked (within ${ft} ft).`;
     statusEl.className = 'status-line ' + (weak ? 'warn' : 'ok');
     onDone();
   };
@@ -1384,7 +1403,7 @@ function getLocation(statusEl, onDone, opts = {}){
   wid = navigator.geolocation.watchPosition(pos=>{
     if(!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
     statusEl.textContent = `Getting a GPS fix… (within ${Math.round(best.coords.accuracy * 3.28).toLocaleString()} ft so far)`;
-    if(best.coords.accuracy <= 15) finish();
+    if(best.coords.accuracy <= 10) finish();
   }, err=>{
     if(err && err.code === 1){ done = true; clearTimeout(timer); if(wid !== null) navigator.geolocation.clearWatch(wid); fallback('Location permission is blocked for this app.'); }
   }, { enableHighAccuracy:true, maximumAge:0, timeout:20000 });
@@ -2063,19 +2082,12 @@ async function renderGallery(){
 
 document.getElementById('findEverythingBtn').addEventListener('click', ()=>{
   const statusEl = document.getElementById('liveStatus');
-  if(!navigator.geolocation){ approxLocateFallback(); return; }
-  statusEl.textContent = 'Locating you…';
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      initMap();
-      if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 16);
-      findEverything();
-      renderMaintenance(); renderSales();
-    },
-    err=>{ approxLocateFallback(err); },
-    { enableHighAccuracy:true, timeout:10000 }
-  );
+  getLocation(statusEl, ()=>{
+    initMap();
+    if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 16);
+    findEverything();
+    renderMaintenance(); renderSales();
+  }, { precise:true });
 });
 
 // GPS gets blocked in sandboxed previews and when permission is denied. Fall
@@ -2683,8 +2695,16 @@ function initMap(){
   let base = 'streets';
   try{ base = localStorage.getItem('stormops:basemap') || 'streets'; }catch(e){}
   (base === 'satellite' ? satellite : streets).addTo(leafletMap);
-  L.control.layers({ 'Streets': streets, 'Satellite': satellite }, null, { position:'topright' }).addTo(leafletMap);
-  leafletMap.on('baselayerchange', e=>{ try{ localStorage.setItem('stormops:basemap', e.name === 'Satellite' ? 'satellite' : 'streets'); }catch(_){} });
+  satellite.eachLayer(l=> l.options && (l.options.maxZoom = 21, l.options.maxNativeZoom = 19));
+  // Esri's "Clarity" imagery is often newer and sharper close in; same free terms
+  const satHD = L.layerGroup([
+    L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 19, attribution: 'Imagery &copy; Esri' }),
+    L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 19 })
+  ]);
+  if(base === 'satellite-hd'){ leafletMap.removeLayer(base === 'satellite' ? satellite : streets); satHD.addTo(leafletMap); }
+  L.control.layers({ 'Streets': streets, 'Satellite': satellite, 'Satellite HD (sharper)': satHD }, null, { position:'topright' }).addTo(leafletMap);
+  leafletMap.setMaxZoom(21);
+  leafletMap.on('baselayerchange', e=>{ try{ localStorage.setItem('stormops:basemap', /HD/.test(e.name) ? 'satellite-hd' : e.name === 'Satellite' ? 'satellite' : 'streets'); }catch(_){} });
 
   mapLayers.jobs = L.layerGroup().addTo(leafletMap);
   mapLayers.leads = L.layerGroup().addTo(leafletMap);
@@ -2717,6 +2737,8 @@ function initMap(){
   drawCityOutlines(leafletMap);
   leafletMap.on('click', e=>{ if(zoneDraft) addZonePoint(e); else onMapClick(e); });
   leafletMap.on('dragstart', ()=>{ myDotFollow = false; });
+  // long-press (or right-click) drops a pin where GPS can't be trusted
+  leafletMap.on('contextmenu', e=> dropPinMenu(leafletMap, e.latlng));
   refreshMapMarkers();
   loadWindReports();
 }
@@ -2728,9 +2750,14 @@ function initMap(){
 let myDot = null, myRing = null, myWatch = null, myDotFollow = true, myDotCentered = false;
 function startMyDot(){
   if(myWatch !== null || !navigator.geolocation || !leafletMap) return;
+  let lastGood = 0;
   myWatch = navigator.geolocation.watchPosition(pos=>{
     const ll = [pos.coords.latitude, pos.coords.longitude], acc = pos.coords.accuracy || 30;
+    // a rough cell-tower reading right after a good GPS one is noise; skip it
+    if(userLoc && userLoc.acc && acc > userLoc.acc * 3 && Date.now() - lastGood < 15000) return;
+    if(acc <= 25) lastGood = Date.now();
     userLoc = { lat: ll[0], lng: ll[1], acc };
+    showAccChip(acc);
     if(!myDot){
       myRing = L.circle(ll, { radius: acc, color:'#2f80ed', weight:1, fillColor:'#2f80ed', fillOpacity:.12, interactive:false }).addTo(leafletMap);
       myDot = L.circleMarker(ll, { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).bindPopup('You are here').addTo(leafletMap);
@@ -2741,7 +2768,51 @@ function startMyDot(){
     }
   }, err=>{
     if(err && err.code === 1) setStatus('mapStatus', 'Location is blocked for this app, so the map can\'t find you. Allow location for this site in your phone settings.', 'warn');
-  }, { enableHighAccuracy:true, maximumAge:10000, timeout:30000 });
+  }, { enableHighAccuracy:true, maximumAge:0, timeout:30000 });
+}
+let accCtl = null;
+function showAccChip(acc){
+  if(!leafletMap) return;
+  if(!accCtl){
+    const C = L.Control.extend({ options:{ position:'bottomleft' }, onAdd(){ const d = L.DomUtil.create('div', 'acc-chip'); L.DomEvent.disableClickPropagation(d); return d; } });
+    accCtl = new C().addTo(leafletMap);
+  }
+  const ft = Math.round(acc * 3.28), el = accCtl.getContainer();
+  el.className = 'acc-chip ' + (acc <= 10 ? 'good' : acc <= 50 ? 'ok' : 'bad');
+  el.innerHTML = `GPS ±${ft.toLocaleString()} ft${acc > 50 ? ' · weak' : acc <= 10 ? ' · sharp' : ' · refining'}`;
+  el.onclick = acc > 50 ? ()=> toast(PRECISE_TIP) : null;
+  if(acc > 50) setStatus('mapStatus', `GPS is only good to about ${ft.toLocaleString()} ft right now. ${PRECISE_TIP} Long-press the map to drop a pin by hand.`, 'warn');
+}
+
+let droppedPin = null;
+function dropPinMenu(map, ll){
+  if(droppedPin) map.removeLayer(droppedPin);
+  droppedPin = L.marker(ll, { draggable:true, icon: L.divIcon({ className:'aff-pin', html:'📌', iconSize:[28,28], iconAnchor:[6,26] }) }).addTo(map);
+  const html = ()=>{ const p = droppedPin.getLatLng(); return `<div class="popup-title">📌 Pin dropped</div><div style="font-size:11px; margin-bottom:6px;">Drag it to fine-tune.</div><div class="popup-links">
+    <a href="#" onclick="pinAction('owner'); return false;">🏠 Who owns this spot</a>
+    <a href="#" onclick="pinAction('me'); return false;">📍 I'm standing here (use as my location)</a>
+    <a href="#" onclick="pinAction('tree'); return false;">🌳 Flag: tree down</a>
+    <a href="#" onclick="pinAction('stump'); return false;">🪵 Flag: stump</a>
+    <a href="#" onclick="pinAction('road'); return false;">🚧 Flag: road closed</a>
+    <a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">🗺️ Open in Google Maps</a></div>`; };
+  droppedPin.bindPopup(html()).openPopup();
+  droppedPin.on('dragend', ()=> droppedPin.setPopupContent(html()).openPopup());
+}
+async function pinAction(kind){
+  if(!droppedPin) return;
+  const { lat, lng } = droppedPin.getLatLng();
+  if(kind === 'owner'){ document.querySelector('.tab[data-tab="owner"]').click(); runOwnerLookup(lat, lng); return; }
+  if(kind === 'me'){
+    userLoc = { lat, lng, acc: 3, manual: true };
+    if(myDot){ myDot.setLatLng([lat, lng]); myRing.setLatLng([lat, lng]).setRadius(3); }
+    myDotFollow = false; leafletMap.closePopup(); toast('Using the pin as your location.');
+    return;
+  }
+  // flags: look up the lot at the pin first so the flag carries the owner/lot
+  const r = await ownerLookupCore(lat, lng);
+  lastOwnerResult = r;
+  leafletMap.closePopup();
+  openMarkSheet(kind);
 }
 function centerOnMe(){
   myDotFollow = true;
@@ -2763,7 +2834,7 @@ function miniMap(elId, lat, lng, rings, opts = {}){
   const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
   if(opts.streets) L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(m);
   else{
-    L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
+    L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 19, errorTileUrl: esri + 'World_Imagery/MapServer/tile/19/0/0' }).addTo(m);
     L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
   }
   // Only draw the lot if its outline is real lat/lng near the dot. A county
@@ -4560,13 +4631,30 @@ async function fetchJSON(url, opts = {}, ms = 15000){
 const STATE_CODES = { Alabama:'AL', Alaska:'AK', Arizona:'AZ', Arkansas:'AR', California:'CA', Colorado:'CO', Connecticut:'CT', Delaware:'DE', 'District of Columbia':'DC', Florida:'FL', Georgia:'GA', Hawaii:'HI', Idaho:'ID', Illinois:'IL', Indiana:'IN', Iowa:'IA', Kansas:'KS', Kentucky:'KY', Louisiana:'LA', Maine:'ME', Maryland:'MD', Massachusetts:'MA', Michigan:'MI', Minnesota:'MN', Mississippi:'MS', Missouri:'MO', Montana:'MT', Nebraska:'NE', Nevada:'NV', 'New Hampshire':'NH', 'New Jersey':'NJ', 'New Mexico':'NM', 'New York':'NY', 'North Carolina':'NC', 'North Dakota':'ND', Ohio:'OH', Oklahoma:'OK', Oregon:'OR', Pennsylvania:'PA', 'Rhode Island':'RI', 'South Carolina':'SC', 'South Dakota':'SD', Tennessee:'TN', Texas:'TX', Utah:'UT', Vermont:'VT', Virginia:'VA', Washington:'WA', 'West Virginia':'WV', Wisconsin:'WI', Wyoming:'WY' };
 // Town, county and state for a spot. Nominatim first; it rate-limits, so
 // Photon and the FCC's census lookup back it up.
+async function censusPlace(lat, lng){
+  // US Census incorporated places (then census-designated places) containing the point
+  for(const layer of [28, 30]){
+    try{
+      const d = await fetchJSON(`https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/${layer}/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=BASENAME,NAME&returnGeometry=false&f=json`, {}, 10000);
+      const a = ((d.features || [])[0] || {}).attributes;
+      if(a && (a.BASENAME || a.NAME)) return a.BASENAME || a.NAME;
+    }catch(e){}
+  }
+  return '';
+}
 async function reverseGeocode(lat, lng){
+  const [g, place] = await Promise.all([reverseGeocodeOSM(lat, lng).catch(e=>e), censusPlace(lat, lng)]);
+  if(g instanceof Error){ if(!place) throw g; return { town: place, township:'', county:'', state:'', stateCode:'', display: place }; }
+  if(place && place.toLowerCase() !== (g.town || '').toLowerCase()){ g.osmTown = g.town; g.town = place; }
+  return g;
+}
+async function reverseGeocodeOSM(lat, lng){
   try{
     const d = await fetchJSON(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&addressdetails=1&lat=${lat}&lon=${lng}`, { headers:{ 'Accept':'application/json' } }, 12000);
     const ad = d.address || {};
     if(d.error || !(ad.county || ad.state)) throw new Error(d.error || 'empty');
     return {
-      town: ad.city || ad.town || ad.village || ad.hamlet || ad.municipality || ad.township || '',
+      town: ad.village || ad.town || ad.city || ad.hamlet || ad.municipality || ad.township || '',
       township: ad.township || '',
       county: (ad.county || '').replace(/\s*county$/i, ''),
       state: ad.state || '',
@@ -4624,7 +4712,7 @@ async function arriveAt(lat, lng, label, fix = {}){
   currentAreaId = area.id;
   userLoc = { lat, lng, acc: fix.acc };
   await saveAreas();
-  renderHere(); renderContacts();
+  announceArea(area);
   if(navigator.onLine) await refreshArea(area, { force:true });
   else setStatus('hereStatus', 'No signal. Area saved. Everything else fills in once you have a connection.', 'warn');
 }
@@ -4635,16 +4723,20 @@ async function switchArea(id){
   currentAreaId = id;
   userLoc = { lat:a.lat, lng:a.lng };
   await saveAreas();
+  announceArea(a);
   await findEverything();
   renderAll();
   if(navigator.onLine) refreshArea(a);
 }
 
 let refreshing = false;
+let pendingRefresh = null;
 async function refreshArea(area, opts = {}){
-  if(refreshing || !area || !navigator.onLine) return;
+  if(!area || !navigator.onLine) return;
+  // a refresh for a different area waits its turn instead of being dropped
+  if(refreshing){ pendingRefresh = { area, opts }; return; }
   if(!opts.force && area.refreshed && Date.now() - area.refreshed < AREA_REFRESH_MIN*60000 && (area.offices || []).length) return;
-  refreshing = true;
+  refreshing = true; renderWhere();
   const name = area.town || 'this area';
   try{
     setStatus('hereStatus', `Updating ${name}: local offices…`);
@@ -4690,7 +4782,25 @@ async function refreshArea(area, opts = {}){
     setStatus('hereStatus', `${name} is up to date and saved for no-signal use.`, 'ok');
   }finally{
     refreshing = false;
+    renderWhere();
+    if(pendingRefresh){ const n = pendingRefresh; pendingRefresh = null; if(n.area.id === currentAreaId) refreshArea(n.area, n.opts); }
   }
+}
+
+// Every tab follows the working area: contacts, shops, owner, map, affected,
+// debris, weather. Called whenever the area changes.
+function announceArea(a){
+  renderAll();
+  renderWhere();
+  if(leafletMap) leafletMap.setView([a.lat, a.lng], Math.max(leafletMap.getZoom(), 15));
+  if(salesMap) salesMap.setView([a.lat, a.lng], 15);
+  if(affMap){ affMap._fitted = false; }
+  affData = null; debrisData = null;
+  const active = document.querySelector('.tab.active');
+  if(active && active.dataset.tab === 'affected') openAffected();
+  if(active && active.dataset.tab === 'debris') openDebris();
+  const os = document.getElementById('ownerStatus');
+  if(os && !lastOwnerResult) os.textContent = `Working in ${bareTown(a.town)}. Tap Look Up Where I'm Standing, or any lot on the Map tab.`;
 }
 
 // ---------- local offices (open map data) ----------
@@ -4930,6 +5040,28 @@ async function lookupParcelOffline(lat, lng){
   return null;
 }
 
+
+// ---------- Google Maps check (Owner tab) ----------
+// Google's plain embed needs no key or account. It's a second opinion on
+// where the pin is, and Google often finds house numbers the free geocoder
+// misses. Needs signal; the Open button hands off to the Google Maps app.
+let gmapTarget = null, gmapType = 'k';
+function showGoogleView(target){
+  gmapTarget = target || gmapTarget;
+  const box = document.getElementById('gmapBox'); if(!box || !gmapTarget) return;
+  const q = gmapTarget.q || `${gmapTarget.lat},${gmapTarget.lng}`;
+  const open = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  const head = `<div class="gmap-head"><b>Google Maps check</b>
+    <button class="small-btn${gmapType === 'k' ? ' go' : ''}" type="button" onclick="gmapType='k'; showGoogleView()">Satellite</button>
+    <button class="small-btn${gmapType === 'm' ? ' go' : ''}" type="button" onclick="gmapType='m'; showGoogleView()">Map</button>
+    <a class="small-btn" href="${open}" target="_blank" rel="noopener">Open in Google Maps</a></div>`;
+  box.className = 'gmap-box';
+  box.innerHTML = navigator.onLine
+    ? head + `<iframe title="Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=19&t=${gmapType}&output=embed"></iframe>
+      <div class="mini-cap" style="padding:6px 10px; margin:0;">${gmapTarget.q ? 'Google’s pin for: ' + escapeHtml(gmapTarget.q) : 'Google’s view of the spot the app checked'}.</div>`
+    : head + '<div class="cat-empty" style="margin:0 10px 10px;">No signal, so Google Maps can’t load. The app’s own satellite view above still works if you’ve viewed this spot before.</div>';
+}
+
 // ---------- owner lookup ----------
 let lastOwnerResult = null;
 async function ownerLookupCore(lat, lng){
@@ -4979,6 +5111,7 @@ async function runOwnerLookup(lat, lng, acc){
   dropMiniMap('ownerMiniMap');
   document.getElementById('ownerResult').innerHTML = '<div class="owner-card"><div class="mini-map" id="ownerMiniMap"></div><p class="mini-cap">Checking this spot…</p></div>';
   miniMap('ownerMiniMap', lat, lng, null, { acc });
+  showGoogleView({ lat, lng });
   const r = await ownerLookupCore(lat, lng);
   r.acc = acc;
   lastOwnerResult = r;
@@ -5077,9 +5210,11 @@ document.getElementById('ownerAddrBtn').addEventListener('click', async ()=>{
   if(!addr){ setStatus('ownerStatus', 'Type an address first.', 'warn'); return; }
   if(!navigator.onLine){ setStatus('ownerStatus', 'No signal, so the address can\'t be located. Use "Look Up Where I\'m Standing" or tap the lot on the Map tab.', 'warn'); return; }
   setStatus('ownerStatus', 'Finding that address…');
+  showGoogleView({ q: addr });
   const loc = await safeGeocode(addr);
-  if(!loc){ setStatus('ownerStatus', 'Address not found. Add the town and state.', 'warn'); return; }
+  if(!loc){ setStatus('ownerStatus', 'The free map couldn\'t place that address, but Google\'s view is below. If Google shows the right house, tap that house on the Map tab to look up the owner.', 'warn'); return; }
   runOwnerLookup(loc.lat, loc.lng);
+  showGoogleView({ q: addr }); // keep Google's own pin for the typed address
 });
 
 // ---------- rendering: Here + Contacts ----------
@@ -5159,9 +5294,16 @@ function callListHtml(a){
 function fixLine(a){
   const f = a.fix || { lat:a.lat, lng:a.lng };
   const how = f.src === 'typed' ? 'Typed town center' : 'GPS';
-  return `<div class="fix-line">${how}: <a href="https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}" target="_blank" rel="noopener">${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}</a>${f.acc ? ` · within ${Math.round(f.acc * 3.28).toLocaleString()} ft` : ''}${f.time ? ' · ' + timeAgo(f.time) : ''}</div>`;
+  return `<div class="fix-line">${how}: <a href="https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}" target="_blank" rel="noopener">${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}</a>${f.acc ? ` · within ${Math.round(f.acc * 3.28).toLocaleString()} ft${f.acc > 50 ? ' <span style="color:var(--danger)">(weak, turn on Precise Location)</span>' : ''}` : ''}${f.time ? ' · ' + timeAgo(f.time) : ''}</div>`;
+}
+function renderWhere(){
+  const a = currentArea(), el = document.getElementById('whereText'); if(!el) return;
+  const bar = document.getElementById('whereBar');
+  bar.classList.toggle('loading', !!refreshing);
+  el.textContent = a ? `Working in ${[bareTown(a.town), a.stateCode || a.state].filter(Boolean).join(', ')}${a.county ? ' · ' + a.county + ' Co.' : ''}${refreshing ? ' · updating…' : ''}` : "No area loaded. Tap here, then I'm Here.";
 }
 function renderHere(){
+  renderWhere();
   const a = currentArea();
   document.getElementById('areaName').textContent = a ? [a.town, a.stateCode || a.state].filter(Boolean).join(', ') : 'No area set yet';
   document.getElementById('areaSub').innerHTML = a

@@ -1,6 +1,6 @@
 // Storm Ops service worker: keeps the app itself, the map library, fonts and
 // every map/satellite tile you've looked at available with no signal.
-const VERSION = 'stormops-v3.5.0';
+const VERSION = 'stormops-v3.6.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',
@@ -17,7 +17,7 @@ self.addEventListener('activate', e=>{
   e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==VERSION && k!==TILE_CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
 });
 
-const isTile = url => /tile\.openstreetmap\.org|server\.arcgisonline\.com\/ArcGIS\/rest\/services\/(World_Imagery|Reference)/.test(url);
+const isTile = url => /tile\.openstreetmap\.org|(server\.arcgisonline\.com\/ArcGIS|clarity\.maptiles\.arcgis\.com\/arcgis)\/rest\/services\/(World_Imagery|Reference)/.test(url);
 const isStatic = url => /cdnjs\.cloudflare\.com|fonts\.(googleapis|gstatic)\.com/.test(url);
 
 async function trimTiles(){
