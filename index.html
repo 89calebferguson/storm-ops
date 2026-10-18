@@ -311,6 +311,14 @@
   .check-progress{ height:6px; background:var(--panel); border-radius:3px; overflow:hidden; margin-bottom:8px; }
   .check-progress > span{ display:block; height:100%; background:var(--ok); }
   .starter-tag{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-dim); border:1px solid var(--line); border-radius:8px; padding:1px 6px; margin-left:6px; }
+  .wx-alert{ background:#3a1c1c; border:1px solid #8a3a3a; border-radius:5px; padding:10px 12px; margin-bottom:6px; }
+  .wx-alert summary{ font-weight:600; font-size:14px; color:#f5a3a3; cursor:pointer; }
+  .wx-alert p{ font-size:12.5px; line-height:1.45; white-space:pre-wrap; margin:6px 0 0; color:var(--text); }
+  .wx-row{ display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:18px; }
+  .wx-cell{ background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:8px 6px; text-align:center; min-width:0; }
+  .wx-when{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wx-temp{ font-family:var(--font-mono); font-size:18px; font-weight:600; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .wx-desc{ font-size:11px; color:var(--text-dim); line-height:1.25; }
   .zone-bar{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
   .zone-swatch{ width:14px; height:14px; border-radius:3px; flex-shrink:0; }
   .zone-label{ background:rgba(22,25,28,.85); color:#f0ede4; border:none; font-family:var(--font-mono); font-size:11px; font-weight:600; padding:2px 6px; border-radius:3px; box-shadow:none; }
@@ -363,6 +371,8 @@
     </div>
     <div class="status-line" id="hereStatus"></div>
     <div class="pack-grid" id="packGrid"></div>
+
+    <div id="hereWeather"></div>
 
     <p class="section-label">First-Week Checklist</p>
     <p class="hint" id="checkHint">Checked items are tracked per area, so every new deployment starts fresh. Tap ✏️ to change, reorder, or add items.</p>
@@ -471,8 +481,9 @@
     <div class="status-line" id="statusMaint">Tap the button — it finds every vendor category around you automatically.</div>
 
     <p class="section-label">Equipment Dealers</p>
-    <p style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px;">These brands aren't in the open map database — these run a live map search near you.</p>
+    <p style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px;">Tap a brand to search the open map for dealers and service shops within 150 miles. Results are saved for no-signal use.</p>
     <div class="live-cats" id="brandCatsMaint"></div>
+    <div id="brandResultsMaint" style="margin-bottom:16px;"></div>
 
     <button class="manage-btn" id="manageToggleMaint">+ Add Trusted Vendor</button>
     <div class="manage-panel" id="managePanelMaint">
@@ -629,8 +640,9 @@
     <div class="live-cats" id="liveCats"></div>
 
     <p class="section-label">Equipment Dealers</p>
-    <p style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px;">These brands aren't reliably in the open map database — these run a live map search instead.</p>
+    <p style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px;">Tap a brand to search the open map for dealers and service shops within 150 miles. Results are saved for no-signal use.</p>
     <div class="live-cats" id="brandCats"></div>
+    <div id="brandResults" style="margin-bottom:16px;"></div>
 
     <div id="liveResults" style="margin-bottom:16px;"></div>
 
@@ -722,10 +734,10 @@
     <p class="section-label">Weather Alerts</p>
     <div class="storm-links" style="margin-bottom:20px;">
       <button class="storm-link" id="weatherLocBtn" style="border:1px solid var(--line); font-family:inherit; cursor:pointer;"><span class="sl-icon">📍</span><span class="sl-label">My Location Forecast</span></button>
-      <button class="storm-link" onclick="openInApp('https://alerts.weather.gov/search?area=IL','Illinois Alerts')"><span class="sl-icon">🌪️</span><span class="sl-label">Illinois Alerts</span></button>
-      <button class="storm-link" onclick="openInApp('https://alerts.weather.gov/search?area=IN','Indiana Alerts')"><span class="sl-icon">🌪️</span><span class="sl-label">Indiana Alerts</span></button>
+      <button class="storm-link" id="stateAlertsBtn" type="button"><span class="sl-icon">🌪️</span><span class="sl-label" id="stateAlertsLabel">State Alerts</span></button>
     </div>
     <div class="status-line" id="weatherStatus"></div>
+    <div id="safetyWeather" style="margin-bottom:20px;"></div>
 
     <p class="section-label">Hazard Reports</p>
     <button class="manage-btn" id="manageToggleHaz">+ Report Hazard</button>
@@ -976,16 +988,16 @@ const LIVE_CATEGORIES = [
   { key:'farm',    label:'Farm & Fleet',   icon:'🧰', filters:[['shop','agrarian'],['shop','farm']] }
 ];
 const BRAND_SEARCHES = [
-  { label:'Vermeer',        icon:'🌲', term:'Vermeer dealer' },
-  { label:'John Deere',     icon:'🚜', term:'John Deere dealer' },
-  { label:'Altec',          icon:'🏗️', term:'Altec dealer service' },
-  { label:'Palfinger',      icon:'🏗️', term:'Palfinger crane dealer' },
-  { label:'Manitou',        icon:'🏗️', term:'Manitou dealer' },
-  { label:'Stihl',          icon:'🪚', term:'Stihl dealer' },
-  { label:'Hydraulic Hose', icon:'🔗', term:'hydraulic hose fittings shop' },
-  { label:'Mobile Welder',  icon:'🔥', term:'mobile welding repair service' },
-  { label:'Equip Rental',   icon:'🏗️', term:'heavy equipment rental' },
-  { label:'Semi Towing',    icon:'🚛', term:'heavy duty semi towing recovery' }
+  { label:'Vermeer',        icon:'🌲', term:'Vermeer dealer', re:'vermeer' },
+  { label:'John Deere',     icon:'🚜', term:'John Deere dealer', re:'john deere|deere' },
+  { label:'Altec',          icon:'🏗️', term:'Altec dealer service', re:'altec' },
+  { label:'Palfinger',      icon:'🏗️', term:'Palfinger crane dealer', re:'palfinger' },
+  { label:'Manitou',        icon:'🏗️', term:'Manitou dealer', re:'manitou' },
+  { label:'Stihl',          icon:'🪚', term:'Stihl dealer', re:'stihl' },
+  { label:'Hydraulic Hose', icon:'🔗', term:'hydraulic hose fittings shop', re:'hydraulic|hose|fluid power' },
+  { label:'Mobile Welder',  icon:'🔥', term:'mobile welding repair service', re:'weld|fabricat' },
+  { label:'Equip Rental',   icon:'🏗️', term:'heavy equipment rental', re:'rental|rent-all|sunbelt|united rentals|herc' },
+  { label:'Semi Towing',    icon:'🚛', term:'heavy duty semi towing recovery', re:'towing|wrecker|recovery' }
 ];
 // liveSearchLayer is declared near the top alongside leafletMap
 let liveResults = [];
@@ -1431,11 +1443,7 @@ function renderMaintenance(){
       `<button class="live-cat" data-idx="${i}"><span class="lc-icon">${b.icon}</span>${b.label}</button>`
     ).join('');
     brands.querySelectorAll('.live-cat').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const b = BRAND_SEARCHES[parseInt(btn.dataset.idx,10)];
-        const near = userLoc ? `@${userLoc.lat},${userLoc.lng},11z` : '';
-        openInApp(`https://www.google.com/maps/search/${encodeURIComponent(b.term)}/${near}`, b.label + ' near you');
-      });
+      btn.addEventListener('click', ()=> brandSearch(parseInt(btn.dataset.idx,10), 'brandResultsMaint', btn));
     });
   }
   const input = document.getElementById('maintAddressInput');
@@ -1737,12 +1745,7 @@ async function renderGallery(){
     `<button class="live-cat" data-idx="${i}"><span class="lc-icon">${b.icon}</span>${b.label}</button>`
   ).join('');
   brands.querySelectorAll('.live-cat').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const b = BRAND_SEARCHES[parseInt(btn.dataset.idx,10)];
-      const near = userLoc ? `@${userLoc.lat},${userLoc.lng},11z` : '';
-      const url = `https://www.google.com/maps/search/${encodeURIComponent(b.term)}/${near}`;
-      openInApp(url, b.label + ' near you');
-    });
+    btn.addEventListener('click', ()=> brandSearch(parseInt(btn.dataset.idx,10), 'brandResults', btn));
   });
 })();
 
@@ -2620,17 +2623,23 @@ function renderJobs(){
 
 // ========== SAFETY: hazards + weather ==========
 document.getElementById('weatherLocBtn').addEventListener('click', ()=>{
-  const statusEl = document.getElementById('weatherStatus');
-  if(!navigator.geolocation){ statusEl.textContent = 'Geolocation not supported.'; return; }
-  statusEl.textContent = 'Locating…';
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      const url = `https://forecast.weather.gov/MapClick.php?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
-      window.open(url, '_blank');
-      statusEl.textContent = '';
-    },
-    err=>{ statusEl.textContent = 'Could not get location: ' + err.message; }
-  );
+  getLocation(document.getElementById('weatherStatus'), async ()=>{
+    setStatus('weatherStatus', 'Loading the NWS forecast…');
+    const wx = await loadWeather(userLoc.lat, userLoc.lng);
+    document.getElementById('safetyWeather').innerHTML = weatherHtml(wx);
+    setStatus('weatherStatus', wx ? '' : 'Could not load the forecast.', wx ? '' : 'warn');
+  });
+});
+document.getElementById('stateAlertsBtn').addEventListener('click', async ()=>{
+  const a = currentArea(); const st = a && a.stateCode ? a.stateCode : 'IL';
+  if(!navigator.onLine){ setStatus('weatherStatus', 'No signal.', 'warn'); return; }
+  setStatus('weatherStatus', 'Loading active alerts for ' + st + '…');
+  try{
+    const d = await fetchJSON('https://api.weather.gov/alerts/active?area=' + st, { headers:{ 'Accept':'application/geo+json' } });
+    const al = (d.features || []).map(f=>f.properties);
+    document.getElementById('safetyWeather').innerHTML = al.length ? alertsHtml(al.slice(0, 40)) : `<div class="cat-empty">No active weather alerts in ${st}.</div>`;
+    setStatus('weatherStatus', al.length + ' active alert' + (al.length===1?'':'s') + ' in ' + st + '.', 'ok');
+  }catch(e){ setStatus('weatherStatus', 'Could not load alerts.', 'warn'); }
 });
 document.getElementById('manageToggleHaz').addEventListener('click', ()=>{
   const p = document.getElementById('managePanelHaz'), b = document.getElementById('manageToggleHaz');
@@ -3005,6 +3014,128 @@ function renderOutages(){
   el.innerHTML = rows.join('');
 }
 
+// ========== DEALER SEARCH (in the app) ==========
+// Searches the open map by name/brand within ~150 mi. Coverage depends on
+// what's been mapped, so there's still a Google Maps fallback when nothing
+// turns up.
+async function brandSearch(i, outId, btn){
+  const b = BRAND_SEARCHES[i];
+  const out = document.getElementById(outId);
+  const loc = userLoc || (currentArea() ? { lat: currentArea().lat, lng: currentArea().lng } : null);
+  if(!loc){ out.innerHTML = '<div class="cat-empty">Load an area or tap "Find" first so the app knows where you are.</div>'; return; }
+  document.querySelectorAll('#' + (outId === 'brandResults' ? 'brandCats' : 'brandCatsMaint') + ' .live-cat').forEach(x=>x.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const key = `brand:${b.label}:${loc.lat.toFixed(1)}_${loc.lng.toFixed(1)}`;
+  let saved = await getJSON(key, null), results = null, note = '';
+  if(navigator.onLine){
+    out.innerHTML = `<div class="cat-empty">Searching for ${escapeHtml(b.label)} within 150 miles…</div>`;
+    try{
+      const R = 240000, re = b.re.replace(/"/g, '');
+      const q = `[out:json][timeout:40];(nwr["name"~"${re}",i](around:${R},${loc.lat},${loc.lng});nwr["brand"~"${re}",i](around:${R},${loc.lat},${loc.lng}););out center tags 200;`;
+      const resp = await withTimeout(fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent(q) }), 45000);
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      const d = await resp.json();
+      const seen = new Set();
+      results = (d.elements || []).map(el=>{
+        const la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon), t = el.tags || {};
+        if(!la || !t.name) return null;
+        // skip things that just happen to match, like roads and schools
+        if(t.highway || t.amenity === 'school' || t.leisure || t.natural || t.place || t.railway || t.waterway) return null;
+        const k = t.name + la.toFixed(3); if(seen.has(k)) return null; seen.add(k);
+        return { name:t.name, catKey:'brand', address:[t['addr:housenumber'], t['addr:street'], t['addr:city']].filter(Boolean).join(' '),
+          phone: t.phone || t['contact:phone'] || '', web: t.website || t['contact:website'] || '', lat:la, lng:lo };
+      }).filter(Boolean);
+      await setJSON(key, { time: Date.now(), results });
+    }catch(e){ note = 'Search failed, the map servers may be busy. '; }
+  }
+  if(!results && saved){ results = saved.results; note += `Showing the list saved ${timeAgo(saved.time)}. `; }
+  if(!results){ out.innerHTML = `<div class="cat-empty">${navigator.onLine ? note + 'Try again in a minute.' : 'No signal and nothing saved for this search yet.'}</div>`; return; }
+  results = results.map(r=>({ ...r, dist: distMiles(loc.lat, loc.lng, r.lat, r.lng) })).sort((x,y)=>x.dist-y.dist).slice(0, 15);
+  brandHits = results;
+  const near = `@${loc.lat},${loc.lng},10z`;
+  out.innerHTML = `<div class="category"><div class="cat-head"><span class="cat-marker">${results.length}</span><span class="cat-title">${escapeHtml(b.label)}</span></div>
+    ${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}
+    ${results.map((r, j)=>`<div class="card">
+      <div class="dist-badge">${r.dist.toFixed(0)}<small>MI</small></div>
+      <div class="card-body">
+        <div class="card-name">${escapeHtml(r.name)}</div>
+        <div class="card-sub">${escapeHtml(r.address) || 'No address in map data'}</div>
+        ${r.phone ? `<div class="card-phone">${escapeHtml(r.phone)}</div>` : ''}
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn star" onclick="saveBrandHit(${j}, '${escapeHtml(b.label).replace(/'/g,'&#39;')}')" aria-label="Save as trusted vendor">★</button>
+        <a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
+        ${r.phone ? `<a class="icon-btn call" href="tel:${r.phone.replace(/[^0-9+]/g,'')}" aria-label="Call">📞</a>` : r.web ? `<a class="icon-btn web" href="${escapeHtml(r.web.startsWith('http') ? r.web : 'https://' + r.web)}" target="_blank" rel="noopener" aria-label="Website">🌐</a>` : ''}
+      </div></div>`).join('') || '<div class="cat-empty">None found in the open map data within 150 miles.</div>'}
+    <a class="small-btn" style="display:block; margin-top:6px;" href="https://www.google.com/maps/search/${encodeURIComponent(b.term)}/${near}" target="_blank" rel="noopener">Not listed? Check Google Maps</a></div>`;
+}
+let brandHits = [];
+async function saveBrandHit(j, label){
+  const r = brandHits[j]; if(!r) return;
+  if(vendors.some(v=>v.name.toLowerCase()===r.name.toLowerCase())){ toast('Already a trusted vendor.'); return; }
+  const cat = /stihl/i.test(label) ? 'Stihl Dealers' : /vermeer/i.test(label) ? 'Vermeer Dealers' : /deere/i.test(label) ? 'John Deere Dealers'
+    : /altec/i.test(label) ? 'Altec Dealers' : /palfinger/i.test(label) ? 'Palfinger Dealers' : /manitou/i.test(label) ? 'Manitou Dealers'
+    : /hose/i.test(label) ? 'Hydraulic Hose & Fittings' : /weld/i.test(label) ? 'Welding & Fabrication' : /rental/i.test(label) ? 'Equipment Rental' : 'Semi Towing & Recovery';
+  const a = currentArea();
+  vendors.push({ id:'v_' + Date.now(), name:r.name, category:cat, address:r.address, phone:r.phone, lat:r.lat, lng:r.lng, town: a ? a.town : '', added: Date.now() });
+  await saveVendors(); renderMaintenance(); if(leafletMap) refreshMapMarkers();
+  toast('Saved ' + r.name + ' as a trusted vendor.');
+}
+
+// ========== WEATHER (in the app) ==========
+// National Weather Service API: free, no key. Forecast + active alerts for
+// the working area, saved for no-signal use.
+async function loadWeather(lat, lng){
+  if(!navigator.onLine) return getJSON('wx:' + lat.toFixed(2) + '_' + lng.toFixed(2), null);
+  const H = { headers:{ 'Accept':'application/geo+json' } };
+  try{
+    const pt = await fetchJSON(`https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`, H);
+    const [fc, al] = await Promise.all([
+      fetchJSON(pt.properties.forecast, H).catch(()=>null),
+      fetchJSON(`https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lng.toFixed(4)}`, H).catch(()=>null)
+    ]);
+    const wx = { time: Date.now(),
+      periods: fc ? (fc.properties.periods || []).slice(0, 6).map(p=>({ name:p.name, temp:p.temperature, unit:p.temperatureUnit, wind:(p.windSpeed || '') + ' ' + (p.windDirection || ''), short:p.shortForecast, detail:p.detailedForecast })) : [],
+      alerts: al ? (al.features || []).map(f=>f.properties) : [] };
+    await setJSON('wx:' + lat.toFixed(2) + '_' + lng.toFixed(2), wx);
+    return wx;
+  }catch(e){ return getJSON('wx:' + lat.toFixed(2) + '_' + lng.toFixed(2), null); }
+}
+function alertsHtml(alerts){
+  return alerts.map(a=>`<details class="wx-alert"><summary>⚠️ ${escapeHtml(a.event || 'Alert')}${a.areaDesc ? ' · ' + escapeHtml(a.areaDesc.split(';').slice(0,3).join(', ')) : ''}</summary>
+    <p>${escapeHtml(a.headline || '')}${a.ends || a.expires ? '\nUntil ' + new Date(a.ends || a.expires).toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit' }) : ''}\n\n${escapeHtml(a.description || '')}${a.instruction ? '\n\n' + escapeHtml(a.instruction) : ''}</p></details>`).join('');
+}
+function weatherHtml(wx){
+  if(!wx) return '';
+  return `${wx.alerts && wx.alerts.length ? alertsHtml(wx.alerts) : ''}
+    ${wx.periods && wx.periods.length ? `<div class="wx-row">${wx.periods.slice(0, 4).map(p=>`<div class="wx-cell" title="${escapeHtml(p.detail || '')}"><div class="wx-when">${escapeHtml(p.name)}</div><div class="wx-temp">${p.temp}°</div><div class="wx-desc">${escapeHtml(p.short)}</div><div class="wx-desc">${escapeHtml(p.wind.trim())}</div></div>`).join('')}</div>` : ''}
+    <div class="fresh" style="margin:-12px 0 16px;">National Weather Service · updated ${timeAgo(wx.time)}${wx.alerts && !wx.alerts.length ? ' · no active alerts here' : ''}</div>`;
+}
+async function renderHereWeather(){
+  const el = document.getElementById('hereWeather'); if(!el) return;
+  const a = currentArea();
+  if(!a){ el.innerHTML = ''; return; }
+  const wx = a.weather || await getJSON('wx:' + a.lat.toFixed(2) + '_' + a.lng.toFixed(2), null);
+  el.innerHTML = wx ? `<p class="section-label">Weather Here</p>${weatherHtml(wx)}` : '';
+}
+
+// ========== COUNTY INFO (Wikidata, free) ==========
+// The county government's official website, phone (where listed) and county
+// seat, so the county row links straight to the county's own site.
+async function loadCountyInfo(county, state){
+  if(!county || !state || !navigator.onLine) return null;
+  const q = `SELECT ?site ?phone ?seatLabel WHERE {
+    ?c rdfs:label "${county.replace(/"/g,'')} County"@en; wdt:P131 ?st. ?st rdfs:label "${state.replace(/"/g,'')}"@en.
+    OPTIONAL { ?c wdt:P856 ?site } OPTIONAL { ?c wdt:P1329 ?phone } OPTIONAL { ?c wdt:P36 ?seat }
+    SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } LIMIT 1`;
+  try{
+    const d = await fetchJSON('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q), { headers:{ 'Accept':'application/sparql-results+json' } }, 15000);
+    const b = (d.results && d.results.bindings || [])[0];
+    if(!b) return null;
+    return { site: b.site ? b.site.value : '', phone: b.phone ? b.phone.value : '', seat: b.seatLabel ? b.seatLabel.value : '' };
+  }catch(e){ return null; }
+}
+
 // ========== FIRST-WEEK CHECKLIST ==========
 // One list of items (Caleb's own, editable here), checked off per area so
 // each deployment starts clean. Starter items are placeholders until the
@@ -3144,6 +3275,14 @@ async function refreshArea(area, opts = {}){
     try{ area.offices = await findOffices(area.lat, area.lng); area.officesTime = Date.now(); }catch(e){}
     await saveAreas(); renderHere(); renderContacts();
 
+    setStatus('hereStatus', `Updating ${name}: weather…`);
+    try{ const wx = await loadWeather(area.lat, area.lng); if(wx) area.weather = wx; }catch(e){}
+    if(area.county && (!area.countyInfo || Date.now() - (area.countyInfoTime || 0) > 30*86400000)){
+      const ci = await loadCountyInfo(area.county, area.state);
+      if(ci){ area.countyInfo = ci; area.countyInfoTime = Date.now(); }
+    }
+    await saveAreas(); renderHere();
+
     setStatus('hereStatus', `Updating ${name}: electric utility…`);
     try{ const u = await findUtility(area.lat, area.lng); if(u.length){ area.utility = u; area.utilityTime = Date.now(); } }catch(e){}
     await saveAreas(); renderHere();
@@ -3200,7 +3339,8 @@ function officeGroupFor(t){
 }
 async function findOffices(lat, lng){
   const R = 40000; // ~25 mi
-  const q = `[out:json][timeout:30];(nwr["amenity"~"^(townhall|police|fire_station|courthouse)$"](around:${R},${lat},${lng});nwr["office"="government"](around:${R},${lat},${lng}););out center tags 400;`;
+  const R2 = 65000; // county offices often sit in the county seat, farther out
+  const q = `[out:json][timeout:30];(nwr["amenity"~"^(townhall|police|fire_station)$"](around:${R},${lat},${lng});nwr["amenity"="courthouse"](around:${R2},${lat},${lng});nwr["office"="government"](around:${R2},${lat},${lng}););out center tags 400;`;
   const resp = await withTimeout(fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent(q) }), 35000);
   if(!resp.ok) throw new Error('HTTP ' + resp.status);
   const data = await resp.json();
@@ -3437,7 +3577,7 @@ function renderOwnerResult(r){
       ${rows.length ? `<dl class="kv">${rows.filter(([k])=>k!=='Owner').map(([k,v])=>`<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : `<p class="card-sub wrap" style="margin:0 0 10px;">${escapeHtml(parcelProblem(r))}</p>`}
       <div class="btn-row">
         ${rows.length ? `<button class="small-btn go" onclick="saveLastOwner()">Save to Log</button><button class="small-btn" onclick="leadFromLastOwner()">Make a Lead</button>` : ''}
-        ${ownerSearch ? `<a class="small-btn" href="${ownerSearch}" target="_blank" rel="noopener">Find Owner's Phone</a>` : ''}
+        ${ownerSearch ? `<a class="small-btn" href="${ownerSearch}" target="_blank" rel="noopener">Search Owner's Phone</a>` : ''}
         <a class="small-btn" href="${gisSearchUrl(r.county, r.state)}" target="_blank" rel="noopener">County GIS</a>
         <a class="small-btn" href="${assessorSearchUrl(r.county, r.state)}" target="_blank" rel="noopener">Assessor</a>
       </div>
@@ -3565,16 +3705,19 @@ function callListHtml(a){
     ${searchRow('Gas utility', 'Who supplies natural gas here', `natural gas utility ${a.town} ${st} emergency number`, '🔥')}</div>`;
 
   const assess = nearest('assess');
+  const ci = a.countyInfo;
+  const countyRow = ci && (ci.site || ci.phone) ? phoneRow(co + ' government', (ci.seat ? 'County seat: ' + ci.seat + '. ' : '') + 'Assessor, highway, and EMA pages are on the county site.', ci.phone, '🏛️', ci.site) : '';
   html += `<div class="call-group"><h3>Property Owners &amp; Records</h3>
+    ${countyRow}
     ${assess.map(o=>phoneRow(o.name, (o.address || '') + ' · ' + o.dist.toFixed(1) + ' mi', o.phone, '📑', o.web)).join('')}
     ${a.parcelSrc ? phoneRow(co + ' property map', 'Owner lookups work in the Owner tab' + (a.parcelSrc.note ? ' (' + a.parcelSrc.note + ')' : '') + '.', '', '🗺️') : ''}
-    ${searchRow(co + ' Assessor / Supervisor of Assessments', 'Owner names, mailing addresses, parcel numbers', `${co} ${st} assessor phone`, '')}
-    ${searchRow(co + ' GIS / Parcel Viewer', 'Map with property lines and owners', `${co} ${st} GIS parcel viewer`, '')}</div>`;
+    ${assess.some(o=>o.phone) ? '' : searchRow(co + ' Assessor / Supervisor of Assessments', 'Not in the free map data. Search for the phone.', `${co} ${st} assessor phone`, '')}
+    ${a.parcelSrc ? '' : searchRow(co + ' GIS / Parcel Viewer', 'Not found automatically. Search for the county map.', `${co} ${st} GIS parcel viewer`, '')}</div>`;
 
   const roads = nearest('roads');
   html += `<div class="call-group"><h3>Roads, Right-of-Way &amp; Permits</h3>
     ${roads.map(o=>phoneRow(o.name, (o.address || '') + ' · ' + o.dist.toFixed(1) + ' mi', o.phone, '🚧', o.web)).join('')}
-    ${searchRow(co + ' Highway Department', 'Trees on county roads, road closures', `${co} ${st} highway department phone`, '')}
+    ${roads.some(o=>o.phone) ? '' : searchRow(co + ' Highway Department', 'Trees on county roads, road closures. Not in the free map data.', `${co} ${st} highway department phone`, '')}
     ${a.township ? searchRow(a.township + ' Road Commissioner', 'Township roads and ditches', `${a.township} ${co} ${st} road commissioner`, '') : searchRow('Township Road Commissioner', 'Township roads and ditches (common in IL and the Midwest)', `${a.town} ${st} township road commissioner`, '')}
     ${searchRow((a.town || 'City') + ' tree / building permit', 'Whether a permit is needed for removals', `${a.town} ${st} tree removal permit storm`, '')}
     ${phoneRow('511 road conditions', 'Closures and conditions, most states', '511', '🛣️')}</div>`;
@@ -3602,6 +3745,7 @@ function renderHere(){
   }else grid.innerHTML = '';
   document.getElementById('hereCallList').innerHTML = callListHtml(a);
   renderChecklist();
+  renderHereWeather();
   const sa = document.getElementById('savedAreas');
   sa.innerHTML = areas.length ? areas.map(x=>`
     <div class="card area-row${x.id===currentAreaId ? ' current' : ''}" onclick="switchArea('${x.id}')">
