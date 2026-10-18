@@ -359,6 +359,26 @@
   .wx-alert{ background:var(--danger-bg); border:1px solid var(--danger-line); border-radius:5px; padding:10px 12px; margin-bottom:6px; }
   .wx-alert summary{ font-weight:600; font-size:14px; color:var(--danger); cursor:pointer; }
   .wx-alert p{ font-size:12.5px; line-height:1.45; white-space:pre-wrap; margin:6px 0 0; color:var(--text); }
+  .center-me-btn{ width:40px; height:40px; border-radius:6px; border:2px solid rgba(0,0,0,.25); background:#fff; color:#1f6fd6; font-size:24px; line-height:1; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  .mini-map{ height:230px; border-radius:8px; overflow:hidden; border:1px solid var(--line); margin:10px 0; background:var(--panel); }
+  .mini-cap{ font-size:12px; color:var(--text-dim); margin:-4px 0 10px; }
+  .wind-now{ display:flex; gap:14px; align-items:center; background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--accent); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+  .wind-now.wind-warn{ border-left-color:#e0a100; } .wind-now.wind-danger{ border-left-color:var(--danger); }
+  .wind-dial{ width:58px; height:58px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--accent); flex:none; }
+  .wind-calm{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
+  .wind-arrow{ display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; }
+  .wind-label{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim); }
+  .wind-speed{ font-family:var(--font-mono); font-size:26px; font-weight:700; color:var(--text); line-height:1.15; }
+  .wind-speed small{ font-size:13px; font-weight:500; color:var(--text-dim); }
+  .wind-dir{ font-size:14px; font-weight:600; color:var(--accent); }
+  .wind-gust{ font-size:14px; font-weight:600; color:var(--text); margin:2px 0; }
+  .wind-sub{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim); margin:4px 0 6px; }
+  .wind-strip{ display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; -webkit-overflow-scrolling:touch; }
+  .wind-hr{ flex:0 0 54px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 2px; text-align:center; color:var(--accent); }
+  .wind-hr-mph{ font-family:var(--font-mono); font-size:16px; font-weight:700; color:var(--text); }
+  .wind-hr.wind-warn{ border-color:#e0a100; } .wind-hr.wind-danger{ border-color:var(--danger); }
+  .wx-desc.wind-warn{ color:#c98a00; font-weight:600; } .wx-desc.wind-danger{ color:var(--danger); font-weight:600; }
+  .wx-wind{ font-size:12px; font-weight:600; color:var(--text); margin-top:3px; }
   .wx-row{ display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:18px; }
   .wx-cell{ background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:8px 6px; text-align:center; min-width:0; }
   .wx-when{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -485,6 +505,7 @@
       <div class="ac-list" id="acListHere"></div>
     </div>
     <div class="status-line" id="hereStatus"></div>
+    <div class="mini-map" id="hereMiniMap" hidden></div>
     <div class="pack-grid" id="packGrid"></div>
 
     <div id="hereWeather"></div>
@@ -1127,7 +1148,8 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
-    if(btn.dataset.tab === 'map'){ initMap(); setTimeout(()=>{ if(leafletMap) leafletMap.invalidateSize(); }, 50); }
+    if(btn.dataset.tab === 'here' && miniMaps.hereMiniMap) setTimeout(()=>miniMaps.hereMiniMap.invalidateSize(), 50);
+    if(btn.dataset.tab === 'map'){ initMap(); setTimeout(()=>{ if(leafletMap) leafletMap.invalidateSize(); }, 50); startMyDot(); }
   });
 });
 
@@ -1144,8 +1166,7 @@ function escapeHtml(s){
 }
 async function geocode(address){
   const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address);
-  const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
-  const data = await resp.json();
+  const data = await fetchJSON(url, { headers: { 'Accept': 'application/json' } }, 15000);
   if(!data || !data.length) return null;
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
 }
@@ -1173,36 +1194,47 @@ async function retryPendingGeocodes(){
   geoRetryRunning = false;
   if(fixed){ renderAll(); toast(fixed + ' saved address' + (fixed>1?'es':'') + ' got map pins.'); }
 }
-function getLocation(statusEl, onDone){
-  const fallback = async ()=>{
-    statusEl.textContent = 'GPS unavailable — trying approximate location…'; statusEl.className='status-line';
+// Phones can take 15-30 seconds to get a GPS fix, especially right after
+// the app opens. Wait for a real fix, then try a quicker rough fix, and only
+// fall back to a city-level guess from the internet address as a last resort.
+// opts.precise: don't accept the city-level guess (owner lookups need the lot).
+function getLocation(statusEl, onDone, opts = {}){
+  const fallback = async (why)=>{
+    if(opts.precise){
+      statusEl.textContent = (why || 'GPS didn\'t answer.') + ' Check that location is allowed for this site in your phone settings, step outside, and tap again. Or type the address.';
+      statusEl.className = 'status-line warn';
+      return;
+    }
+    statusEl.textContent = 'GPS unavailable, trying approximate location…'; statusEl.className='status-line';
     try{
-      const resp = await fetch('https://ipwho.is/');
+      const resp = await withTimeout(fetch('https://ipwho.is/'), 10000);
       const data = await resp.json();
       if(data && data.latitude && data.longitude){
-        userLoc = { lat: data.latitude, lng: data.longitude };
+        userLoc = { lat: data.latitude, lng: data.longitude, approx: true };
         const where = [data.city, data.region].filter(Boolean).join(', ');
-        statusEl.textContent = 'Sorted from approximate location' + (where ? ': ' + where : '') + '. Type an address if that is off.';
-        statusEl.className='status-line ok';
+        statusEl.textContent = 'Using approximate location' + (where ? ': ' + where : '') + ' (from your phone carrier, can be far off). Type an address if that is wrong.';
+        statusEl.className='status-line warn';
         onDone();
         return;
       }
       throw new Error('no coords');
     }catch(e){
-      statusEl.textContent = 'Location unavailable — type an address instead.'; statusEl.className='status-line warn';
+      statusEl.textContent = 'Location unavailable. Type an address instead.'; statusEl.className='status-line warn';
     }
   };
-  if(!navigator.geolocation){ fallback(); return; }
-  statusEl.textContent = 'Locating…'; statusEl.className='status-line';
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      statusEl.textContent = 'Location locked. List sorted by distance.'; statusEl.className='status-line ok';
-      onDone();
-    },
-    err=>{ fallback(); },
-    { enableHighAccuracy:true, timeout:10000 }
-  );
+  if(!navigator.geolocation){ fallback('This browser has no GPS access.'); return; }
+  statusEl.textContent = 'Getting a GPS fix…'; statusEl.className='status-line';
+  const ok = pos=>{
+    userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+    statusEl.textContent = 'Location locked' + (pos.coords.accuracy ? ` (within ${Math.round(pos.coords.accuracy * 3.28)} ft)` : '') + '.'; statusEl.className='status-line ok';
+    onDone();
+  };
+  navigator.geolocation.getCurrentPosition(ok, err=>{
+    if(err && err.code === 1){ fallback('Location permission is blocked for this app.'); return; }
+    statusEl.textContent = 'Still looking for GPS…';
+    navigator.geolocation.getCurrentPosition(ok, e2=> fallback(e2 && e2.code === 1 ? 'Location permission is blocked for this app.' : 'GPS didn\'t get a fix.'),
+      { enableHighAccuracy:false, timeout:15000, maximumAge:300000 });
+  }, { enableHighAccuracy:true, timeout:25000, maximumAge:30000 });
 }
 
 // ---------- storage ----------
@@ -1873,7 +1905,7 @@ document.getElementById('findEverythingBtn').addEventListener('click', ()=>{
     pos=>{
       userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       initMap();
-      if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 12);
+      if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 16);
       findEverything();
       renderMaintenance(); renderSales();
     },
@@ -1889,12 +1921,12 @@ async function approxLocateFallback(err){
   const statusEl = document.getElementById('liveStatus');
   statusEl.textContent = 'GPS unavailable here — trying approximate location…';
   try{
-    const resp = await fetch('https://ipwho.is/');
+    const resp = await withTimeout(fetch('https://ipwho.is/'), 10000);
     const data = await resp.json();
     if(data && data.latitude && data.longitude){
       userLoc = { lat: data.latitude, lng: data.longitude };
       initMap();
-      if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 11);
+      if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 16);
       await findEverything();
       const where = [data.city, data.region].filter(Boolean).join(', ');
       statusEl.textContent += where ? ` (approximate: ${where} — type an address above if that's wrong)` : '';
@@ -1939,7 +1971,7 @@ document.getElementById('manualCoordBtn').addEventListener('click', ()=>{
   if(!m){ statusEl.textContent = 'Enter coordinates as: 41.5648, -87.5389'; return; }
   userLoc = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
   initMap();
-  if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 12);
+  if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 16);
   statusEl.textContent = 'Location set manually. Searching…';
   findEverything();
   renderMaintenance(); renderSales();
@@ -1963,8 +1995,7 @@ acInput.addEventListener('focus', ()=>{ if(acResults.length) acList.classList.ad
 async function fetchSuggestions(q){
   try{
     const url = `https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8&lang=en&layer=city&layer=district&layer=locality`;
-    const resp = await fetch(url);
-    const data = await resp.json();
+    const data = await fetchJSON(url, {}, 10000);
     acResults = (data.features || [])
       .filter(f=> (f.properties||{}).countrycode === 'US')
       .map(f=>{
@@ -1996,7 +2027,7 @@ function renderSuggestions(){
       // coordinates come straight from the pick — no second geocode needed
       userLoc = { lat: r.lat, lng: r.lng };
       initMap();
-      if(leafletMap) leafletMap.setView([r.lat, r.lng], 12);
+      if(leafletMap) leafletMap.setView([r.lat, r.lng], 16);
       findEverything();
       renderMaintenance(); renderSales();
     });
@@ -2014,7 +2045,7 @@ document.getElementById('mapAddressBtn').addEventListener('click', async ()=>{
     if(!loc){ statusEl.textContent = 'Address not found. Try adding the state.'; return; }
     userLoc = loc;
     initMap();
-    if(leafletMap) leafletMap.setView([loc.lat, loc.lng], 12);
+    if(leafletMap) leafletMap.setView([loc.lat, loc.lng], 16);
     findEverything();
     renderMaintenance(); renderSales();
   }catch(e){ statusEl.textContent = 'Lookup failed — check connection.'; }
@@ -2037,11 +2068,8 @@ async function queryOverpassFor(cats, radiusMeters){
     });
   });
   const query = `[out:json][timeout:30];(${parts});out center 300;`;
-  const resp = await fetch('https://overpass-api.de/api/interpreter', {
-    method:'POST', body:'data=' + encodeURIComponent(query)
-  });
-  if(resp.status === 429 || resp.status === 504){ throw new Error('rate_limited'); }
-  const data = await resp.json();
+  let data;
+  try{ data = await overpass(query, 35000); }catch(e){ throw new Error('rate_limited'); }
   return (data.elements || []).map(el=>{
     const lat = el.lat || (el.center && el.center.lat);
     const lng = el.lon || (el.center && el.center.lon);
@@ -2242,8 +2270,7 @@ async function lookupParcel(lat, lng, county, state){
     `/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326` +
     `&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&geometryPrecision=6&f=json`;
   try{
-    const resp = await fetch(url);
-    const data = await resp.json();
+    const data = await fetchJSON(url, {}, 20000);
     if(data.error) return { status:'error', message: data.error.message || 'county server error', src };
     const feat = (data.features || [])[0];
     if(!feat) return { status:'no_parcel', src };
@@ -2475,7 +2502,8 @@ function initMap(){
   if(leafletMap) return;
   if(typeof L === 'undefined'){ setStatus('mapStatus', 'The map needs signal the first time it loads. After that it works offline.', 'warn'); return; }
   const a0 = currentArea();
-  leafletMap = L.map('leafletMap').setView(a0 ? [a0.lat, a0.lng] : [40.5, -89.0], a0 ? 13 : 7); // default: roughly central IL/IN
+  const c0 = userLoc && !userLoc.approx ? userLoc : a0;
+  leafletMap = L.map('leafletMap').setView(c0 ? [c0.lat, c0.lng] : [40.5, -89.0], c0 ? 16 : 7); // no fix yet: central IL until GPS answers
   const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
@@ -2514,10 +2542,71 @@ function initMap(){
     });
   });
 
+  const CenterCtl = L.Control.extend({ options:{ position:'topleft' }, onAdd(){
+    const b = L.DomUtil.create('button', 'center-me-btn');
+    b.type = 'button'; b.title = 'Center on me'; b.setAttribute('aria-label', 'Center on me'); b.innerHTML = '◎';
+    L.DomEvent.on(b, 'click', e=>{ L.DomEvent.stop(e); centerOnMe(); });
+    return b;
+  }});
+  new CenterCtl().addTo(leafletMap);
+
   leafletMap.on('click', e=>{ if(zoneDraft) addZonePoint(e); else onMapClick(e); });
+  leafletMap.on('dragstart', ()=>{ myDotFollow = false; });
   refreshMapMarkers();
   loadWindReports();
 }
+
+// ---------- where I am on the map ----------
+// A live blue dot that follows the phone's GPS while the Map tab is open.
+// The first good fix zooms to street level; dragging the map stops following
+// until Center on Me is tapped.
+let myDot = null, myRing = null, myWatch = null, myDotFollow = true, myDotCentered = false;
+function startMyDot(){
+  if(myWatch !== null || !navigator.geolocation || !leafletMap) return;
+  myWatch = navigator.geolocation.watchPosition(pos=>{
+    const ll = [pos.coords.latitude, pos.coords.longitude], acc = pos.coords.accuracy || 30;
+    userLoc = { lat: ll[0], lng: ll[1], acc };
+    if(!myDot){
+      myRing = L.circle(ll, { radius: acc, color:'#2f80ed', weight:1, fillColor:'#2f80ed', fillOpacity:.12, interactive:false }).addTo(leafletMap);
+      myDot = L.circleMarker(ll, { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).bindPopup('You are here').addTo(leafletMap);
+    }else{ myDot.setLatLng(ll); myRing.setLatLng(ll).setRadius(acc); }
+    if(!myDotCentered || myDotFollow){
+      leafletMap.setView(ll, myDotCentered ? leafletMap.getZoom() : Math.max(leafletMap.getZoom(), 17));
+      myDotCentered = true;
+    }
+  }, err=>{
+    if(err && err.code === 1) setStatus('mapStatus', 'Location is blocked for this app, so the map can\'t find you. Allow location for this site in your phone settings.', 'warn');
+  }, { enableHighAccuracy:true, maximumAge:10000, timeout:30000 });
+}
+function centerOnMe(){
+  myDotFollow = true;
+  if(myDot){ leafletMap.setView(myDot.getLatLng(), Math.max(leafletMap.getZoom(), 17)); return; }
+  if(myWatch === null) startMyDot();
+  setStatus('mapStatus', 'Getting a GPS fix…');
+  getLocation(document.getElementById('mapStatus'), ()=>{ if(leafletMap) leafletMap.setView([userLoc.lat, userLoc.lng], 17); }, { precise:true });
+}
+
+// Small satellite close-up with the pin and lot line, so the crew can check
+// they're at the right house when it has no number on it. Tiles are saved by
+// the service worker, so a spot seen once still shows with no signal.
+const miniMaps = {};
+function miniMap(elId, lat, lng, rings){
+  const el = document.getElementById(elId);
+  if(!el || typeof L === 'undefined'){ if(el) el.innerHTML = '<div class="cat-empty">Map needs signal the first time.</div>'; return; }
+  dropMiniMap(elId);
+  const m = L.map(el, { zoomControl:true, attributionControl:false, scrollWheelZoom:false, zoomAnimation:false, fadeAnimation:false, markerZoomAnimation:false }).setView([lat, lng], 19);
+  const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+  L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
+  L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
+  if(rings && rings.length){
+    const lot = L.polygon(rings.map(r=>r.map(([x,y])=>[y,x])), { color:'#ff7a1a', weight:3, fillOpacity:.08 }).addTo(m);
+    try{ m.fitBounds(lot.getBounds(), { padding:[24,24], maxZoom:19 }); }catch(e){}
+  }
+  L.circleMarker([lat, lng], { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).addTo(m);
+  miniMaps[elId] = m;
+  setTimeout(()=>{ if(miniMaps[elId] === m) m.invalidateSize(); }, 60);
+}
+function dropMiniMap(elId){ if(miniMaps[elId]){ try{ miniMaps[elId].remove(); }catch(e){} delete miniMaps[elId]; } }
 
 function refreshMapMarkers(){
   if(!leafletMap) return;
@@ -3148,9 +3237,7 @@ async function brandSearch(i, outId, btn){
     try{
       const R = 240000, re = b.re.replace(/"/g, '');
       const q = `[out:json][timeout:40];(nwr["name"~"${re}",i](around:${R},${loc.lat},${loc.lng});nwr["brand"~"${re}",i](around:${R},${loc.lat},${loc.lng}););out center tags 200;`;
-      const resp = await withTimeout(fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent(q) }), 45000);
-      if(!resp.ok) throw new Error('HTTP ' + resp.status);
-      const d = await resp.json();
+      const d = await overpass(q, 45000);
       const seen = new Set();
       results = (d.elements || []).map(el=>{
         const la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon), t = el.tags || {};
@@ -3203,29 +3290,119 @@ async function saveBrandHit(j, label){
 // National Weather Service API: free, no key. Forecast + active alerts for
 // the working area, saved for no-signal use.
 async function loadWeather(lat, lng){
-  if(!navigator.onLine) return getJSON('wx:' + lat.toFixed(2) + '_' + lng.toFixed(2), null);
+  const key = 'wx:' + lat.toFixed(2) + '_' + lng.toFixed(2);
+  if(!navigator.onLine) return getJSON(key, null);
   const H = { headers:{ 'Accept':'application/geo+json' } };
   try{
     const pt = await fetchJSON(`https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`, H);
-    const [fc, al] = await Promise.all([
-      fetchJSON(pt.properties.forecast, H).catch(()=>null),
-      fetchJSON(`https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lng.toFixed(4)}`, H).catch(()=>null)
+    const P = pt.properties || {};
+    const [fc, al, hr, grid, obs] = await Promise.all([
+      fetchJSON(P.forecast, H).catch(()=>null),
+      fetchJSON(`https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lng.toFixed(4)}`, H).catch(()=>null),
+      P.forecastHourly ? fetchJSON(P.forecastHourly, H).catch(()=>null) : null,
+      P.forecastGridData ? fetchJSON(P.forecastGridData, H, 20000).catch(()=>null) : null,
+      P.observationStations ? latestObservation(P.observationStations, lat, lng, H).catch(()=>null) : null
     ]);
+    const gusts = grid && grid.properties && grid.properties.windGust ? grid.properties.windGust.values || [] : [];
+    const old = await getJSON(key, null);
     const wx = { time: Date.now(),
-      periods: fc ? (fc.properties.periods || []).slice(0, 6).map(p=>({ name:p.name, temp:p.temperature, unit:p.temperatureUnit, wind:(p.windSpeed || '') + ' ' + (p.windDirection || ''), short:p.shortForecast, detail:p.detailedForecast })) : [],
+      now: obs || (old && old.now) || null,
+      periods: fc ? (fc.properties.periods || []).slice(0, 6).map(p=>({ name:p.name, temp:p.temperature, unit:p.temperatureUnit,
+        wind:(p.windSpeed || '') + ' ' + (p.windDirection || ''), windSpeed:p.windSpeed || '', windDir:p.windDirection || '',
+        gust: maxGustBetween(gusts, p.startTime, p.endTime), short:p.shortForecast, detail:p.detailedForecast })) : [],
+      hourly: hr ? (hr.properties.periods || []).slice(0, 12).map(p=>({ start:p.startTime, temp:p.temperature,
+        mph: parseInt(p.windSpeed, 10) || 0, dir: p.windDirection || '',
+        gust: (p.windGust && parseInt(p.windGust, 10)) || maxGustBetween(gusts, p.startTime, p.endTime), short:p.shortForecast })) : [],
       alerts: al ? (al.features || []).map(f=>f.properties) : [] };
-    await setJSON('wx:' + lat.toFixed(2) + '_' + lng.toFixed(2), wx);
+    await setJSON(key, wx);
     return wx;
-  }catch(e){ return getJSON('wx:' + lat.toFixed(2) + '_' + lng.toFixed(2), null); }
+  }catch(e){ return getJSON(key, null); }
 }
+// Latest reading from the nearest weather station that is actually
+// reporting wind (some stations go quiet or report blanks).
+async function latestObservation(stationsUrl, lat, lng, H){
+  const st = await fetchJSON(stationsUrl, H);
+  const list = (st.features || []).slice(0, 4);
+  for(const f of list){
+    const sp = f.properties || {};
+    try{
+      const o = await fetchJSON(`https://api.weather.gov/stations/${sp.stationIdentifier}/observations/latest`, H, 10000);
+      const q = o.properties || {};
+      if(q.windSpeed == null || q.windSpeed.value == null) continue;
+      if(q.timestamp && Date.now() - Date.parse(q.timestamp) > 3*3600000) continue; // stale
+      const c = f.geometry && f.geometry.coordinates;
+      return { station: sp.name || sp.stationIdentifier, id: sp.stationIdentifier, at: q.timestamp,
+        dist: c ? distMiles(lat, lng, c[1], c[0]) : null,
+        mph: toMph(q.windSpeed), gust: q.windGust && q.windGust.value != null ? toMph(q.windGust) : null,
+        deg: q.windDirection ? q.windDirection.value : null,
+        tempF: q.temperature && q.temperature.value != null ? Math.round(q.temperature.value * 9/5 + 32) : null,
+        text: q.textDescription || '' };
+    }catch(e){ /* next station */ }
+  }
+  return null;
+}
+function toMph(v){
+  if(!v || v.value == null) return null;
+  const u = v.unitCode || '';
+  if(/m_s-1/.test(u)) return Math.round(v.value * 2.237);
+  if(/kt|knot/.test(u)) return Math.round(v.value * 1.151);
+  return Math.round(v.value * 0.6214); // km/h, the API's usual unit
+}
+// Highest forecast gust (km/h in the grid data) overlapping a time window.
+function maxGustBetween(values, start, end){
+  if(!values || !values.length || !start) return null;
+  const s0 = Date.parse(start), e0 = end ? Date.parse(end) : s0 + 3600000;
+  let best = null;
+  values.forEach(v=>{
+    const [t, dur] = String(v.validTime).split('/');
+    const vs = Date.parse(t), m = /PT?(?:(\d+)D)?T?(?:(\d+)H)?/.exec(dur || '') || [];
+    const ve = vs + ((+m[1] || 0) * 24 + (+m[2] || 1)) * 3600000;
+    if(vs < e0 && ve > s0 && v.value != null){ const mph = Math.round(v.value * 0.6214); if(best === null || mph > best) best = mph; }
+  });
+  return best;
+}
+const COMPASS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function degToCompass(d){ return d == null ? '' : COMPASS[Math.round(((d % 360) + 360) % 360 / 22.5) % 16]; }
+function compassToDeg(c){ const i = COMPASS.indexOf(String(c || '').toUpperCase()); return i < 0 ? null : i * 22.5; }
+// Arrow points the way the wind is blowing (a north wind blows south).
+function windArrow(deg, size = 16){
+  if(deg == null) return '';
+  return `<span class="wind-arrow" style="width:${size}px;height:${size}px;transform:rotate(${(deg + 180) % 360}deg)" aria-hidden="true"><svg viewBox="0 0 24 24" width="${size}" height="${size}"><path d="M12 2l6 9h-4v11h-4V11H6z" fill="currentColor"/></svg></span>`;
+}
+function gustClass(g){ return g == null ? '' : g >= 40 ? ' wind-danger' : g >= 25 ? ' wind-warn' : ''; }
 function alertsHtml(alerts){
   return alerts.map(a=>`<details class="wx-alert"><summary>⚠️ ${escapeHtml(a.event || 'Alert')}${a.areaDesc ? ' · ' + escapeHtml(a.areaDesc.split(';').slice(0,3).join(', ')) : ''}</summary>
     <p>${escapeHtml(a.headline || '')}${a.ends || a.expires ? '\nUntil ' + new Date(a.ends || a.expires).toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit' }) : ''}\n\n${escapeHtml(a.description || '')}${a.instruction ? '\n\n' + escapeHtml(a.instruction) : ''}</p></details>`).join('');
 }
+function windNowHtml(n){
+  if(!n) return '';
+  const calm = !n.mph;
+  const g = n.gust;
+  return `<div class="wind-now${gustClass(g != null ? g : n.mph)}">
+    <div class="wind-dial">${calm ? '<span class="wind-calm">CALM</span>' : windArrow(n.deg, 40)}</div>
+    <div class="wind-main">
+      <div class="wind-label">Wind right now</div>
+      <div class="wind-speed">${calm ? 'Calm' : `${n.mph} <small>mph</small>`}${n.deg != null && !calm ? ` <span class="wind-dir">from ${degToCompass(n.deg)} (${Math.round(n.deg)}°)</span>` : ''}</div>
+      <div class="wind-gust">${g != null ? `Gusts ${g} mph` : 'No gusts reported'}${n.tempF != null ? ` · ${n.tempF}°F` : ''}${n.text ? ' · ' + escapeHtml(n.text) : ''}</div>
+      <div class="fresh">${escapeHtml(n.station || '')}${n.dist != null ? ` (${n.dist.toFixed(0)} mi away)` : ''}${n.at ? ' · read ' + timeAgo(Date.parse(n.at)) : ''}</div>
+    </div></div>`;
+}
+function windHourlyHtml(h){
+  if(!h || !h.length) return '';
+  return `<p class="wind-sub">Wind next 12 hours</p><div class="wind-strip">${h.map(x=>`<div class="wind-hr${gustClass(x.gust != null ? x.gust : x.mph)}">
+      <div class="wx-when">${new Date(x.start).toLocaleTimeString([], { hour:'numeric' })}</div>
+      ${windArrow(compassToDeg(x.dir), 18)}
+      <div class="wind-hr-mph">${x.mph}</div>
+      <div class="wx-desc">${escapeHtml(x.dir)}</div>
+      <div class="wx-desc">${x.gust != null ? 'G ' + x.gust : '&nbsp;'}</div>
+    </div>`).join('')}</div>`;
+}
 function weatherHtml(wx){
   if(!wx) return '';
   return `${wx.alerts && wx.alerts.length ? alertsHtml(wx.alerts) : ''}
-    ${wx.periods && wx.periods.length ? `<div class="wx-row">${wx.periods.slice(0, 4).map(p=>`<div class="wx-cell" title="${escapeHtml(p.detail || '')}"><div class="wx-when">${escapeHtml(p.name)}</div><div class="wx-temp">${p.temp}°</div><div class="wx-desc">${escapeHtml(p.short)}</div><div class="wx-desc">${escapeHtml(p.wind.trim())}</div></div>`).join('')}</div>` : ''}
+    ${windNowHtml(wx.now)}
+    ${windHourlyHtml(wx.hourly)}
+    ${wx.periods && wx.periods.length ? `<div class="wx-row">${wx.periods.slice(0, 4).map(p=>`<div class="wx-cell" title="${escapeHtml(p.detail || '')}"><div class="wx-when">${escapeHtml(p.name)}</div><div class="wx-temp">${p.temp}°</div><div class="wx-desc">${escapeHtml(p.short)}</div><div class="wx-wind">${windArrow(compassToDeg(p.windDir), 12)} ${escapeHtml((p.windSpeed || p.wind || '').trim())} ${escapeHtml(p.windDir || '')}</div>${p.gust != null ? `<div class="wx-desc${gustClass(p.gust)}">Gusts ${p.gust}</div>` : ''}</div>`).join('')}</div>` : ''}
     <div class="fresh" style="margin:-12px 0 16px;">National Weather Service · updated ${timeAgo(wx.time)}${wx.alerts && !wx.alerts.length ? ' · no active alerts here' : ''}</div>`;
 }
 async function renderHereWeather(){
@@ -3323,23 +3500,79 @@ const PARCEL_REFRESH_DAYS = 90;   // property records re-download quarterly
 function currentArea(){ return areas.find(a=>a.id===currentAreaId) || null; }
 function setStatus(id, msg, cls){ const el = document.getElementById(id); if(el){ el.textContent = msg; el.className = 'status-line' + (cls ? ' ' + cls : ''); } }
 function withTimeout(promise, ms){ return Promise.race([promise, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), ms))]); }
+// Overpass (open map search) is free but its main server is often busy,
+// especially on phone carriers where many people share one address. Try the
+// public mirrors in turn before giving up.
+const OVERPASS_SERVERS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+];
+let overpassFirst = 0; // start with whichever server answered last time
+async function overpass(query, ms = 35000){
+  let lastErr = null;
+  for(let n = 0; n < OVERPASS_SERVERS.length; n++){
+    const i = (overpassFirst + n) % OVERPASS_SERVERS.length;
+    try{
+      const resp = await withTimeout(fetch(OVERPASS_SERVERS[i], { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body:'data=' + encodeURIComponent(query) }), ms);
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      const d = await resp.json();
+      if(d.remark && /runtime error|timed out|out of memory/i.test(d.remark) && !(d.elements||[]).length) throw new Error(d.remark);
+      overpassFirst = i;
+      return d;
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('map search failed');
+}
 async function fetchJSON(url, opts = {}, ms = 15000){
   const resp = await withTimeout(fetch(url, opts), ms);
   if(!resp.ok) throw new Error('HTTP ' + resp.status);
   return resp.json();
 }
 
+const STATE_CODES = { Alabama:'AL', Alaska:'AK', Arizona:'AZ', Arkansas:'AR', California:'CA', Colorado:'CO', Connecticut:'CT', Delaware:'DE', 'District of Columbia':'DC', Florida:'FL', Georgia:'GA', Hawaii:'HI', Idaho:'ID', Illinois:'IL', Indiana:'IN', Iowa:'IA', Kansas:'KS', Kentucky:'KY', Louisiana:'LA', Maine:'ME', Maryland:'MD', Massachusetts:'MA', Michigan:'MI', Minnesota:'MN', Mississippi:'MS', Missouri:'MO', Montana:'MT', Nebraska:'NE', Nevada:'NV', 'New Hampshire':'NH', 'New Jersey':'NJ', 'New Mexico':'NM', 'New York':'NY', 'North Carolina':'NC', 'North Dakota':'ND', Ohio:'OH', Oklahoma:'OK', Oregon:'OR', Pennsylvania:'PA', 'Rhode Island':'RI', 'South Carolina':'SC', 'South Dakota':'SD', Tennessee:'TN', Texas:'TX', Utah:'UT', Vermont:'VT', Virginia:'VA', Washington:'WA', 'West Virginia':'WV', Wisconsin:'WI', Wyoming:'WY' };
+// Town, county and state for a spot. Nominatim first; it rate-limits, so
+// Photon and the FCC's census lookup back it up.
 async function reverseGeocode(lat, lng){
-  const d = await fetchJSON(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&addressdetails=1&lat=${lat}&lon=${lng}`, { headers:{ 'Accept':'application/json' } });
-  const ad = d.address || {};
-  return {
-    town: ad.city || ad.town || ad.village || ad.hamlet || ad.municipality || ad.township || '',
-    township: ad.township || '',
-    county: (ad.county || '').replace(/\s*county$/i, ''),
-    state: ad.state || '',
-    stateCode: ((ad['ISO3166-2-lvl4'] || '').split('-')[1]) || '',
-    display: d.display_name || ''
-  };
+  try{
+    const d = await fetchJSON(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&addressdetails=1&lat=${lat}&lon=${lng}`, { headers:{ 'Accept':'application/json' } }, 12000);
+    const ad = d.address || {};
+    if(d.error || !(ad.county || ad.state)) throw new Error(d.error || 'empty');
+    return {
+      town: ad.city || ad.town || ad.village || ad.hamlet || ad.municipality || ad.township || '',
+      township: ad.township || '',
+      county: (ad.county || '').replace(/\s*county$/i, ''),
+      state: ad.state || '',
+      stateCode: ((ad['ISO3166-2-lvl4'] || '').split('-')[1]) || STATE_CODES[ad.state] || '',
+      display: d.display_name || ''
+    };
+  }catch(e){}
+  let town = '', county = '', state = '';
+  try{
+    const d = await fetchJSON(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&limit=1&lang=en`, {}, 10000);
+    const p = ((d.features || [])[0] || {}).properties || {};
+    town = p.city || p.town || p.village || p.locality || p.district || '';
+    county = (p.county || '').replace(/\s*county$/i, ''); state = p.state || '';
+  }catch(e){}
+  if(!county || !state){
+    try{
+      const d = await fetchJSON(`https://geo.fcc.gov/api/census/area?lat=${lat}&lon=${lng}&format=json`, {}, 10000);
+      const r = (d.results || [])[0];
+      if(r){ county = county || (r.county_name || '').replace(/\s*county$/i, ''); state = state || r.state_name || ''; }
+    }catch(e){}
+  }
+  if(!county && !state && !town) throw new Error('reverse geocode failed');
+  return { town, township:'', county, state, stateCode: STATE_CODES[state] || '', display: [town, county ? county + ' County' : '', state].filter(Boolean).join(', ') };
+}
+// Street address at an exact spot (house number when the map has it).
+async function addressAt(lat, lng){
+  try{
+    const d = await fetchJSON(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`, { headers:{ 'Accept':'application/json' } }, 10000);
+    const ad = d.address || {};
+    const street = [ad.house_number, ad.road].filter(Boolean).join(' ');
+    return street ? [street, ad.city || ad.town || ad.village || ad.hamlet || ''].filter(Boolean).join(', ') : '';
+  }catch(e){ return ''; }
 }
 
 async function arriveAt(lat, lng, label){
@@ -3384,12 +3617,12 @@ async function switchArea(id){
 let refreshing = false;
 async function refreshArea(area, opts = {}){
   if(refreshing || !area || !navigator.onLine) return;
-  if(!opts.force && area.refreshed && Date.now() - area.refreshed < AREA_REFRESH_MIN*60000) return;
+  if(!opts.force && area.refreshed && Date.now() - area.refreshed < AREA_REFRESH_MIN*60000 && (area.offices || []).length) return;
   refreshing = true;
   const name = area.town || 'this area';
   try{
     setStatus('hereStatus', `Updating ${name}: local offices…`);
-    try{ area.offices = await findOffices(area.lat, area.lng); area.officesTime = Date.now(); }catch(e){}
+    await updateOffices(area);
     await saveAreas(); renderHere(); renderContacts();
 
     setStatus('hereStatus', `Updating ${name}: weather…`);
@@ -3445,7 +3678,7 @@ const OFFICE_GROUPS = [
 ];
 function officeGroupFor(t){
   const n = (t.name || '').toLowerCase();
-  if(/emergency management|\bema\b|esda/.test(n)) return 'ema';
+  if(/emergency management|\bema\b|esda/.test(n) || t.emergency === 'emergency_management') return 'ema';
   if(/assess|treasur|recorder|clerk|tax|gis|zoning|planning/.test(n)) return 'assess';
   if(/highway|road|street|public works|transport|\bdot\b|maintenance/.test(n)) return 'roads';
   if(t.amenity === 'townhall') return 'hall';
@@ -3457,12 +3690,19 @@ function officeGroupFor(t){
 async function findOffices(lat, lng){
   const R = 40000; // ~25 mi
   const R2 = 65000; // county offices often sit in the county seat, farther out
-  const q = `[out:json][timeout:30];(nwr["amenity"~"^(townhall|police|fire_station)$"](around:${R},${lat},${lng});nwr["amenity"="courthouse"](around:${R2},${lat},${lng});nwr["office"="government"](around:${R2},${lat},${lng}););out center tags 400;`;
-  const resp = await withTimeout(fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent(q) }), 35000);
-  if(!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
+  // Two smaller searches instead of one big one, so a busy server can still
+  // answer and one failing doesn't lose the other.
+  const queries = [
+    `[out:json][timeout:25];(nwr["amenity"~"^(townhall|police|fire_station)$"](around:${R},${lat},${lng});nwr["amenity"="courthouse"](around:${R2},${lat},${lng}););out center tags 300;`,
+    `[out:json][timeout:25];(nwr["office"="government"](around:${R2},${lat},${lng});nwr["government"](around:${R},${lat},${lng});nwr["emergency"="emergency_management"](around:${R2},${lat},${lng}););out center tags 300;`
+  ];
+  const els = [], errs = [];
+  for(const q of queries){
+    try{ const d = await overpass(q, 30000); els.push(...(d.elements || [])); }catch(e){ errs.push(e); }
+  }
+  if(errs.length === queries.length) throw errs[0];
   const seen = new Set();
-  return (data.elements || []).map(el=>{
+  return els.map(el=>{
     const la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon);
     const t = el.tags || {};
     if(!la || !t.name) return null;
@@ -3649,7 +3889,8 @@ async function ownerLookupCore(lat, lng){
     const off = await lookupParcelOffline(lat, lng);
     if(off){ p = off; if(!county){ county = off.county; state = off.state; } }
   }
-  return { lat, lng, county, state, fullAddr, p: p || { status: navigator.onLine ? 'no_source' : 'offline_none' } };
+  const street = navigator.onLine ? await addressAt(lat, lng) : '';
+  return { lat, lng, county, state, fullAddr, street, p: p || { status: navigator.onLine ? 'no_source' : 'offline_none' } };
 }
 function parcelRows(p){
   if(!p || p.status !== 'ok') return [];
@@ -3674,7 +3915,9 @@ function assessorSearchUrl(county, state){ return `https://www.google.com/search
 
 async function runOwnerLookup(lat, lng){
   setStatus('ownerStatus', 'Checking county property records…');
-  document.getElementById('ownerResult').innerHTML = '';
+  dropMiniMap('ownerMiniMap');
+  document.getElementById('ownerResult').innerHTML = '<div class="owner-card"><div class="mini-map" id="ownerMiniMap"></div><p class="mini-cap">Checking this spot…</p></div>';
+  miniMap('ownerMiniMap', lat, lng, null);
   const r = await ownerLookupCore(lat, lng);
   lastOwnerResult = r;
   renderOwnerResult(r);
@@ -3686,11 +3929,14 @@ function renderOwnerResult(r){
   const rows = parcelRows(r.p);
   const owner = r.p && r.p.owner ? r.p.owner.value : '';
   const place = [r.county ? r.county + ' County' : '', r.state].filter(Boolean).join(', ');
+  dropMiniMap('ownerMiniMap');
   const ownerSearch = owner ? `https://www.google.com/search?q=${encodeURIComponent('"' + owner + '" ' + (r.county || '') + ' ' + (r.state || '') + ' phone')}` : '';
   el.innerHTML = `
     <div class="owner-card">
       <p class="eyebrow" style="margin:0 0 4px;">${escapeHtml(place || 'Property')}</p>
       <div class="owner-name">${escapeHtml(owner || (rows.length ? 'Owner not published' : 'No record found'))}</div>
+      <div class="mini-map" id="ownerMiniMap"></div>
+      <p class="mini-cap">${r.street ? 'Map address: ' + escapeHtml(r.street) + ' · ' : ''}Blue dot is the spot checked${r.p && r.p.rings ? ', orange line is the lot' : ''}. <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${r.lat},${r.lng}" target="_blank" rel="noopener">Street View</a></p>
       ${rows.length ? `<dl class="kv">${rows.filter(([k])=>k!=='Owner').map(([k,v])=>`<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : `<p class="card-sub wrap" style="margin:0 0 10px;">${escapeHtml(parcelProblem(r))}</p>`}
       <div class="btn-row">
         ${rows.length ? `<button class="small-btn go" onclick="saveLastOwner()">Save to Log</button><button class="small-btn" onclick="leadFromLastOwner()">Make a Lead</button>` : ''}
@@ -3699,6 +3945,7 @@ function renderOwnerResult(r){
         <a class="small-btn" href="${assessorSearchUrl(r.county, r.state)}" target="_blank" rel="noopener">Assessor</a>
       </div>
     </div>`;
+  miniMap('ownerMiniMap', r.lat, r.lng, r.p && r.p.rings);
 }
 function propertyFromResult(r){
   const v = k=> r.p && r.p[k] ? String(r.p[k].value) : '';
@@ -3761,7 +4008,7 @@ function renderProperties(){
 }
 document.getElementById('propFilter').addEventListener('input', renderProperties);
 document.getElementById('ownerHereBtn').addEventListener('click', ()=>{
-  getLocation(document.getElementById('ownerStatus'), ()=> runOwnerLookup(userLoc.lat, userLoc.lng));
+  getLocation(document.getElementById('ownerStatus'), ()=> runOwnerLookup(userLoc.lat, userLoc.lng), { precise:true });
 });
 document.getElementById('ownerAddrBtn').addEventListener('click', async ()=>{
   const addr = document.getElementById('ownerAddrInput').value.trim();
@@ -3860,6 +4107,12 @@ function renderHere(){
       [(a.utility||[]).length ? '✓' : '—', 'Utility'], [a.parcelSrc ? '✓' : '—', 'Owner lookup'], [a.parcelCount ? a.parcelCount.toLocaleString() : '—', 'Lots offline']
     ].map(([n,l])=>`<div class="pack-cell"><div class="pack-num">${n}</div><div class="pack-label">${l}</div></div>`).join('');
   }else grid.innerHTML = '';
+  const hm = document.getElementById('hereMiniMap');
+  const spot = userLoc && !userLoc.approx && a && distMiles(userLoc.lat, userLoc.lng, a.lat, a.lng) < 30 ? userLoc : a;
+  if(spot){
+    const key = spot.lat.toFixed(5) + ',' + spot.lng.toFixed(5);
+    if(hm.dataset.at !== key){ hm.hidden = false; hm.dataset.at = key; miniMap('hereMiniMap', spot.lat, spot.lng, null); if(miniMaps.hereMiniMap) miniMaps.hereMiniMap.setZoom(16); }
+  }else if(!spot) hm.hidden = true;
   document.getElementById('hereCallList').innerHTML = callListHtml(a);
   renderChecklist();
   renderHereWeather();
@@ -3880,6 +4133,20 @@ async function deleteArea(id){
   if(currentAreaId === id) currentAreaId = areas[0] ? areas[0].id : null;
   await saveAreas(); renderHere(); renderContacts();
   toast('Area deleted.', async ()=>{ areas = before; currentAreaId = prevCur; await saveAreas(); renderHere(); renderContacts(); });
+}
+async function updateOffices(area){
+  area.officesLoading = true; area.officesError = ''; renderContacts();
+  try{
+    const found = await findOffices(area.lat, area.lng);
+    if(found.length || !(area.offices || []).length){ area.offices = found; area.officesTime = Date.now(); }
+    if(!found.length) area.officesError = 'none';
+  }catch(e){ area.officesError = String(e && e.message || e); }
+  area.officesLoading = false;
+}
+async function retryOffices(){
+  const a = currentArea(); if(!a) return;
+  if(!navigator.onLine){ toast('No signal right now.'); return; }
+  await updateOffices(a); await saveAreas(); renderContacts(); renderHere();
 }
 let officeFilter = 'all';
 function renderContacts(){
@@ -3910,7 +4177,16 @@ function renderContacts(){
         ${o.phone ? `<a class="icon-btn call" href="${tel}" aria-label="Call">📞</a>` : `<a class="icon-btn web" href="https://www.google.com/search?q=${encodeURIComponent(o.name + ' ' + (a.town||'') + ' ' + (a.state||'') + ' phone')}" target="_blank" rel="noopener" aria-label="Find phone">🔎</a>`}
       </div>
     </div>`;
-  }).join('') : `<div class="cat-empty">${a ? 'No offices found yet. They load when you have signal.' : 'No area loaded.'}</div>`;
+  }).join('') : `<div class="cat-empty">${officesEmptyText(a)}</div>`;
+}
+function officesEmptyText(a){
+  if(!a) return 'No area loaded. Pick or load one on the Here tab.';
+  if(a.officesLoading) return 'Searching the open map for offices near ' + escapeHtml(a.town || 'here') + '…';
+  const retry = ' <button class="small-btn" onclick="retryOffices()">Try again</button>';
+  if(!navigator.onLine) return 'No signal and no offices saved for this area yet. They load the next time you have signal.';
+  if(a.officesError === 'none') return 'The open map has no offices listed within 25 miles of here. Use the Who To Call list above.' + retry;
+  if(a.officesError) return 'The map servers didn\'t answer (' + escapeHtml(a.officesError) + '). They get busy after storms.' + retry;
+  return 'Offices haven\'t loaded for this area yet.' + retry;
 }
 const GROUP_TO_TYPE = { hall:'City / Village Hall', sheriff:'Sheriff / Police', police:'Sheriff / Police', fire:'Other', assess:'County Assessor / GIS', roads:'County Highway / Roads', ema:'Emergency Mgmt (EMA)', court:'Other', gov:'Other' };
 async function saveOffice(i){
