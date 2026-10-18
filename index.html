@@ -274,6 +274,19 @@
   .webview-fallback a{ background:var(--accent); color:var(--accent-ink); text-decoration:none; padding:12px 24px; border-radius:4px; font-family:var(--font-display); font-weight:700; text-transform:uppercase; font-size:13px; }
 
   /* live nearby search */
+  .job-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .job-num{ font-family:var(--font-mono); font-size:15px; font-weight:700; color:var(--accent, #ff7a1a); }
+  .job-lbl{ display:block; font-family:var(--font-display); font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dim); margin:12px 0 6px; }
+  .job-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .job-chip{ border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:18px; padding:9px 13px; font-size:14px; }
+  .job-chip.on{ background:#ff7a1a; border-color:#ff7a1a; color:#fff; font-weight:600; }
+  .job-photos{ display:flex; gap:6px; flex-wrap:wrap; }
+  .job-photos img, .job-add-photo{ width:68px; height:68px; border-radius:6px; object-fit:cover; }
+  .job-add-photo{ border:1px dashed var(--line); background:var(--bg); color:var(--text); font-size:22px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .job-add-photo span{ font-size:11px; }
+  .job-more{ margin:12px 0 4px; } .job-more summary{ cursor:pointer; font-size:14px; color:var(--text-dim); padding:6px 0; }
+  .job-card{ display:flex; gap:10px; align-items:stretch; }
+  .job-thumb{ width:64px; min-width:64px; height:64px; border-radius:6px; object-fit:cover; background:var(--bg); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; }
   .live-cats{ display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:10px; }
   .live-cat{
     background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:5px;
@@ -778,7 +791,37 @@
   <!-- JOBS VIEW -->
   <div class="view" id="view-jobs">
     <p class="section-label">Job Board</p>
-    <div class="field" style="margin-bottom:10px;">
+    <button class="manage-btn" id="manageToggleJobs">+ New Job</button>
+    <div class="manage-panel" id="managePanelJobs">
+      <div class="job-head"><h2 style="margin:0;">New Job</h2><span class="job-num" id="jNumShow">#1001</span></div>
+      <input type="hidden" id="jNumber">
+      <label class="job-lbl">What's the work?</label>
+      <div class="job-chips" id="jWorkChips">
+        <button type="button" class="job-chip on" data-v="Tree removal">🌳 Tree</button>
+        <button type="button" class="job-chip" data-v="Stump grinding">🪵 Stump</button>
+        <button type="button" class="job-chip" data-v="Tree + stump">🌳🪵 Both</button>
+        <button type="button" class="job-chip" data-v="Limbs / cleanup">🍂 Cleanup</button>
+        <button type="button" class="job-chip" data-v="Other">Other</button>
+      </div>
+      <input type="hidden" id="jWork" value="Tree removal">
+      <label class="job-lbl">Where?</label>
+      <div style="display:flex; gap:6px;">
+        <div class="field" style="flex:1; margin:0;"><input type="text" id="jAddress" placeholder="Street address"></div>
+        <button type="button" class="small-btn" id="jHereBtn" title="Use where I am">📍 Here</button>
+      </div>
+      <label class="job-lbl">Photos</label>
+      <div class="job-photos" id="jPhotoStrip"><button type="button" class="job-add-photo" id="jPhotoBtn">📷<span>Add</span></button></div>
+      <input type="file" id="jPhotoInput" accept="image/*" multiple style="display:none;">
+      <details class="job-more"><summary>More details (crew, hazards, notes)</summary>
+        <div class="field"><label>Status</label><select id="jStatus"><option>Scheduled</option><option>In Progress</option><option>Completed</option></select></div>
+        <div class="field"><label>Crew</label><input type="text" id="jCrew" placeholder="e.g. Brandon's crew"></div>
+        <div class="field"><label>Hazards</label><input type="text" id="jHazards" placeholder="e.g. line down near driveway"></div>
+        <div class="field"><label>Notes</label><textarea id="jNotes" placeholder="Scope, equipment needed, etc."></textarea></div>
+      </details>
+      <button class="add-btn" id="jAddBtn">Save Job</button>
+      <div class="geocode-status" id="jGeoStatus"></div>
+    </div>
+    <div class="field" style="margin:14px 0 10px;">
       <label>Filter by Status</label>
       <select id="jobFilter">
         <option value="">All</option>
@@ -788,23 +831,6 @@
         <option value="tree">🌳 Has tree work</option>
         <option value="stump">🪵 Has stump work</option>
       </select>
-    </div>
-    <button class="manage-btn" id="manageToggleJobs">+ Add Job</button>
-    <div class="manage-panel" id="managePanelJobs">
-      <h2>Add Job</h2>
-      <div class="field-row" style="display:flex; gap:8px;">
-        <div class="field" style="flex:1;"><label>Job Number</label><input type="text" id="jNumber" placeholder="e.g. 4471"></div>
-        <div class="field" style="flex:1;"><label>Status</label>
-          <select id="jStatus"><option>Scheduled</option><option>In Progress</option><option>Completed</option></select>
-        </div>
-      </div>
-      <div class="field"><label>Work</label><select id="jWork"><option>Tree removal</option><option>Stump grinding</option><option>Tree + stump</option><option>Limbs / cleanup</option><option>Other</option></select></div>
-      <div class="field"><label>Address</label><input type="text" id="jAddress" placeholder="Street, City, State"></div>
-      <div class="field"><label>Crew Assigned</label><input type="text" id="jCrew" placeholder="e.g. Brandon's crew"></div>
-      <div class="field"><label>Hazards on Site</label><input type="text" id="jHazards" placeholder="e.g. line down near driveway, leave blank if none"></div>
-      <div class="field"><label>Notes</label><textarea id="jNotes" placeholder="Scope, equipment needed, etc."></textarea></div>
-      <button class="add-btn" id="jAddBtn">Add Job</button>
-      <div class="geocode-status" id="jGeoStatus"></div>
     </div>
     <div id="jobsResults"></div>
   </div>
@@ -1441,6 +1467,7 @@ async function loadAll(){
   cities    = await getJSON('cities', []);
   activeCity = await getJSON('activeCity', 'all');
   territories = await getJSON('territories', []);
+  jobCounter = await getJSON('jobCounter', 1000);
   areas     = await getJSON('areas', []);
   currentAreaId = await getJSON('currentArea', null);
   await loadCustomCounties();
@@ -3051,13 +3078,55 @@ async function onMapClick(e){
   `);
 }
 
+// Job numbers count up on their own: next = highest number used + 1.
+let jobCounter = 1000; // highest number ever handed out, so a deleted job's number isn't reused
+function nextJobNumber(){
+  const max = jobs.reduce((m, j)=>{ const n = parseInt(String(j.number).replace(/\D/g, ''), 10); return n > m && n < 1e7 ? n : m; }, jobCounter);
+  return String(max + 1);
+}
+let jobDraftPhotos = [], jobDraftLoc = null;
+function openJobForm(prefill = {}){
+  const p = document.getElementById('managePanelJobs'), b = document.getElementById('manageToggleJobs');
+  p.classList.add('open'); b.classList.add('active'); b.textContent = '− Close';
+  const n = nextJobNumber();
+  document.getElementById('jNumber').value = n; document.getElementById('jNumShow').textContent = 'Job #' + n;
+  if(prefill.address) document.getElementById('jAddress').value = prefill.address;
+  if(prefill.lat != null) jobDraftLoc = { lat: prefill.lat, lng: prefill.lng };
+  if(prefill.work) setJobWork(prefill.work);
+}
+function setJobWork(v){
+  document.getElementById('jWork').value = v;
+  document.querySelectorAll('#jWorkChips .job-chip').forEach(c=> c.classList.toggle('on', c.dataset.v === v));
+}
+document.querySelectorAll('#jWorkChips .job-chip').forEach(c=> c.addEventListener('click', ()=> setJobWork(c.dataset.v)));
 document.getElementById('manageToggleJobs').addEventListener('click', ()=>{
   const p = document.getElementById('managePanelJobs'), b = document.getElementById('manageToggleJobs');
-  p.classList.toggle('open'); b.classList.toggle('active');
-  b.textContent = p.classList.contains('open') ? '− Add Job' : '+ Add Job';
+  if(p.classList.contains('open')){ p.classList.remove('open'); b.classList.remove('active'); b.textContent = '+ New Job'; }
+  else openJobForm();
 });
+document.getElementById('jHereBtn').addEventListener('click', ()=>{
+  const g = document.getElementById('jGeoStatus');
+  getLocation(g, async ()=>{
+    jobDraftLoc = { lat: userLoc.lat, lng: userLoc.lng };
+    g.textContent = 'Finding the address…';
+    let addr = ''; try{ addr = await addressAt(userLoc.lat, userLoc.lng); }catch(e){}
+    if(addr && typeof addr === 'object') addr = addr.street || addr.display || '';
+    if(addr) document.getElementById('jAddress').value = String(addr).split(',').slice(0,2).join(',');
+    g.textContent = addr ? 'Spot set. Fix the address if it is off.' : 'Spot set. Type the address if you know it.';
+  });
+});
+document.getElementById('jPhotoBtn').addEventListener('click', ()=> document.getElementById('jPhotoInput').click());
+document.getElementById('jPhotoInput').addEventListener('change', async e=>{
+  for(const f of Array.from(e.target.files)){ try{ jobDraftPhotos.push(await fileToCompressedDataUrl(f)); }catch(_){} }
+  e.target.value = ''; renderJobDraftPhotos();
+});
+function renderJobDraftPhotos(){
+  const strip = document.getElementById('jPhotoStrip');
+  strip.querySelectorAll('img').forEach(i=>i.remove());
+  jobDraftPhotos.forEach((u, i)=>{ const img = document.createElement('img'); img.src = u; img.title = 'Tap to remove'; img.onclick = ()=>{ jobDraftPhotos.splice(i, 1); renderJobDraftPhotos(); }; strip.insertBefore(img, document.getElementById('jPhotoBtn')); });
+}
 document.getElementById('jAddBtn').addEventListener('click', async ()=>{
-  const number = document.getElementById('jNumber').value.trim();
+  const number = document.getElementById('jNumber').value.trim() || nextJobNumber();
   const status = document.getElementById('jStatus').value;
   const address = document.getElementById('jAddress').value.trim();
   const crew = document.getElementById('jCrew').value.trim();
@@ -3065,16 +3134,28 @@ document.getElementById('jAddBtn').addEventListener('click', async ()=>{
   const notes = document.getElementById('jNotes').value.trim();
   const work = document.getElementById('jWork').value;
   const gStatus = document.getElementById('jGeoStatus');
-  if(!number || !address){ gStatus.textContent = 'Job number and address are required.'; return; }
+  if(!address && !jobDraftLoc){ gStatus.textContent = 'Add an address or tap 📍 Here.'; return; }
   gStatus.textContent = 'Saving…';
-  const loc = await safeGeocode(address);
-  jobs.push({ id:'j_'+Date.now(), number, status, work, address, crew, hazardsNote, notes, lat: loc?loc.lat:null, lng: loc?loc.lng:null, pendingGeo: !loc });
+  const loc = jobDraftLoc || (address ? await safeGeocode(address) : null);
+  const id = 'j_' + Date.now();
+  const photoIds = [];
+  for(const u of jobDraftPhotos){ const pid = id + '_p' + Date.now() + '_' + Math.floor(Math.random()*1000); try{ await store.set('photo:' + pid, u); photoIds.push(pid); }catch(e){} }
+  jobs.push({ id, number, status, work, address: address || 'Pinned spot', crew, hazardsNote, notes, photoIds, created: Date.now(), lat: loc?loc.lat:null, lng: loc?loc.lng:null, pendingGeo: !loc });
+  const nn = parseInt(number.replace(/\D/g, ''), 10); if(nn > jobCounter && nn < 1e7){ jobCounter = nn; await setJSON('jobCounter', jobCounter); }
   await saveJobs();
-  document.getElementById('jNumber').value=''; document.getElementById('jAddress').value='';
-  document.getElementById('jCrew').value=''; document.getElementById('jHazards').value=''; document.getElementById('jNotes').value='';
-  gStatus.textContent = 'Added job #' + number + (loc ? '.' : '. Map pin will be added once you have signal.');
+  ['jAddress','jCrew','jHazards','jNotes'].forEach(k=> document.getElementById(k).value = '');
+  document.getElementById('jStatus').value = 'Scheduled'; setJobWork('Tree removal');
+  jobDraftPhotos = []; jobDraftLoc = null; renderJobDraftPhotos();
+  gStatus.textContent = 'Saved job #' + number + (loc ? '.' : '. Map pin will be added once you have signal.');
+  openJobForm();
   renderJobs();
 });
+function jobFromLastOwner(){
+  const r = lastOwnerResult; if(!r) return;
+  document.querySelector('.tab[data-tab="jobs"]').click();
+  openJobForm({ address: (r.street || (r.fullAddr || '').split(',').slice(0,2).join(',')).trim(), lat: r.lat, lng: r.lng });
+  document.getElementById('managePanelJobs').scrollIntoView({ behavior:'smooth' });
+}
 async function deleteJob(id){ const undo = offerUndo('Job', ()=>jobs, v=>{ jobs = v; }, saveJobs); jobs = jobs.filter(j=>j.id!==id); await saveJobs(); renderJobs(); undo(); }
 async function cycleJobStatus(id){
   const order = ['Scheduled','In Progress','Completed'];
@@ -3095,21 +3176,27 @@ function renderJobs(){
   results.innerHTML = list.map(j=>{
     const mapUrl = j.lat ? `https://www.google.com/maps/search/?api=1&query=${j.lat},${j.lng}` : null;
     const pillClass = 'status-' + j.status.replace(' ','-');
+    const label = `Job #${escapeHtml(j.number).replace(/'/g,"&#39;")}`;
+    const k = cityOf(j.lat, j.lng);
+    const n = (j.photoIds || []).length;
     return `
-      <div class="card">
+      <div class="card job-card">
+        ${n ? `<img class="job-thumb" data-photo="${j.photoIds[0]}" alt="" onclick="openGallery('jobs','${j.id}','${label}')">` : `<button class="job-thumb" onclick="openGallery('jobs','${j.id}','${label}')" title="Add photo">📷</button>`}
         <div class="card-body">
-          <div class="card-name">#${escapeHtml(j.number)} <span class="status-pill ${pillClass}" onclick="cycleJobStatus('${j.id}')" style="cursor:pointer;">${j.status}</span>${j.hazardsNote ? ' ⚠️' : ''}</div>
-          <div class="card-sub">${(()=>{ const k = cityOf(j.lat, j.lng); return k ? `<span style="color:${k.color}">●</span> ${escapeHtml(k.name)} · ` : ''; })()}${j.work ? (/stump/i.test(j.work) ? '🪵 ' : '🌳 ') + escapeHtml(j.work) + ' · ' : ''}${escapeHtml(j.address)}${j.crew ? ' · '+escapeHtml(j.crew) : ''}</div>
+          <div class="card-name">#${escapeHtml(j.number)} ${j.work ? (/stump/i.test(j.work) && !/tree/i.test(j.work) ? '🪵 ' : '🌳 ') + escapeHtml(j.work) : ''}${j.hazardsNote ? ' ⚠️' : ''}</div>
+          <div class="card-sub">${escapeHtml(j.address)}${k ? ` · <span style="color:${k.color}">●</span> ${escapeHtml(k.name)}` : ''}</div>
+          <div class="card-sub"><span class="status-pill ${pillClass}" onclick="cycleJobStatus('${j.id}')" style="cursor:pointer;">${j.status} ›</span>${j.crew ? ' ' + escapeHtml(j.crew) : ''}${n > 1 ? ` · ${n} photos` : ''}</div>
           ${j.hazardsNote ? `<div class="card-sub prio-High">Hazard: ${escapeHtml(j.hazardsNote)}</div>` : ''}
           ${j.notes ? `<div class="card-sub">${escapeHtml(j.notes)}</div>` : ''}
         </div>
         <div class="card-actions">
-          ${mapUrl ? `<button class="icon-btn" onclick="openInApp('${mapUrl}','Job #${escapeHtml(j.number).replace(/'/g,"&#39;")}')">📍</button>` : ''}
-          <button class="icon-btn photo" onclick="openGallery('jobs','${j.id}','Job #${escapeHtml(j.number).replace(/'/g,"&#39;")}')">📷${j.photoIds&&j.photoIds.length?`<span class="pcount">${j.photoIds.length}</span>`:''}</button>
+          ${mapUrl ? `<button class="icon-btn" onclick="openInApp('${mapUrl}','${label}')">📍</button>` : ''}
+          <button class="icon-btn photo" onclick="openGallery('jobs','${j.id}','${label}')">📷${n ? `<span class="pcount">${n}</span>` : ''}</button>
           <button class="icon-btn del" onclick="deleteJob('${j.id}')">×</button>
         </div>
       </div>`;
   }).join('');
+  results.querySelectorAll('img[data-photo]').forEach(async img=>{ try{ img.src = (await store.get('photo:' + img.dataset.photo)).value; }catch(e){} });
 }
 
 // ========== SAFETY: hazards + weather ==========
@@ -5185,7 +5272,7 @@ function renderOwnerResult(r){
       <p class="mini-cap">${r.street ? 'Map address: ' + escapeHtml(r.street) + ' · ' : ''}Blue dot is the spot checked${r.acc ? ` (GPS within ${Math.round(r.acc * 3.28).toLocaleString()} ft${r.acc > 60 ? ', weak fix' : ''})` : ''}${ringsNear(r.p && r.p.rings, r.lat, r.lng) ? ', orange line is the lot' : ''}. <b>Wrong house? Tap the right one on this map.</b> <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${r.lat},${r.lng}" target="_blank" rel="noopener">Street View</a></p>
       ${rows.length ? `<dl class="kv">${rows.filter(([k])=>k!=='Owner').map(([k,v])=>`<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : `<p class="card-sub wrap" style="margin:0 0 10px;">${escapeHtml(parcelProblem(r))}</p>`}
       <div class="btn-row">
-        ${rows.length ? `<button class="small-btn go" onclick="saveLastOwner()">Save to Log</button><button class="small-btn" onclick="leadFromLastOwner()">Make a Lead</button>` : ''}
+        ${rows.length ? `<button class="small-btn go" onclick="saveLastOwner()">Save to Log</button><button class="small-btn" onclick="leadFromLastOwner()">Make a Lead</button><button class="small-btn" onclick="jobFromLastOwner()">Make a Job</button>` : ''}
         ${ownerSearch ? `<a class="small-btn" href="${ownerSearch}" target="_blank" rel="noopener">Search Owner's Phone</a>` : ''}
         <a class="small-btn" href="${gisSearchUrl(r.county, r.state)}" target="_blank" rel="noopener">County GIS</a>
         <a class="small-btn" href="${assessorSearchUrl(r.county, r.state)}" target="_blank" rel="noopener">Assessor</a>
@@ -5580,7 +5667,7 @@ attachTownAutocomplete('contactsTownInput', 'acListContacts', pick=>{ setStatus(
 // Only these save copies are ever deleted, never the real jobs, leads,
 // flags or photos. The newest copy is always kept.
 const AUTOSAVE_MS = 15000, SNAP_BIN_MS = 60000, SNAP_PURGE_MS = 30*60000;
-const SNAP_KEYS = ['vendors','leads','needs','officials','jobs','hazards','roster','notes','icsLog','ics213','properties','marks','zones','territories','cities','activeCity','checklistItems','customCounties','drafts'];
+const SNAP_KEYS = ['vendors','leads','needs','officials','jobs','hazards','roster','notes','icsLog','ics213','properties','marks','zones','territories','cities','activeCity','checklistItems','customCounties','drafts','jobCounter'];
 let lastAutoSave = 0, lastSnapSig = '', autoSaving = false;
 function collectDrafts(){
   const d = {};
