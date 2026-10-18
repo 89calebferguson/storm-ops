@@ -381,6 +381,20 @@
   .town-group{ border:2px solid var(--accent); border-radius:10px; padding:10px; }
   .town-links{ margin-top:8px; }
   .aff-pin{ font-size:20px; line-height:24px; text-align:center; filter:drop-shadow(0 0 2px #fff); }
+  .city-lbl span{ display:inline-block; transform:translate(-50%,-50%); white-space:nowrap; background:rgba(255,255,255,.9); color:#111; font-weight:700; font-size:12px; padding:2px 8px; border-radius:10px; border:2px solid; }
+  .city-chips{ display:flex; flex-direction:column; gap:0; }
+  .town-card{ cursor:pointer; }
+  .town-sec{ margin-top:16px; }
+  .city-chip{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:20px; border:2px solid var(--line); background:var(--panel); font-weight:600; font-size:14px; cursor:pointer; }
+  .city-chip.on{ border-color:var(--accent); }
+  .city-chip .sw{ width:12px; height:12px; border-radius:50%; }
+  .city-chip button{ background:none; border:0; color:var(--text-dim); font-size:18px; cursor:pointer; padding:0 2px; }
+  .city-pick{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .city-pick label{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim); }
+  .city-pick select{ flex:1; font-size:16px; }
+  .city-tot{ display:grid; grid-template-columns:1fr auto auto auto; gap:4px 10px; font-size:13px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:12px; }
+  .city-tot b{ font-family:var(--font-mono); }
+  .city-tot .h{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--text-dim); }
   .terr-sw{ width:16px; height:16px; border-radius:4px; flex:none; margin-right:10px; align-self:center; }
   .terr-rep{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin:10px 0 4px; display:flex; align-items:center; gap:6px; }
   .terr-lbl{ background:rgba(255,255,255,.85); border:0; border-radius:4px; font-weight:700; font-size:12px; color:#111; padding:2px 6px; box-shadow:none; }
@@ -531,6 +545,13 @@
     </div>
     <div class="status-line" id="hereStatus"></div>
     <div class="mini-map" id="hereMiniMap" hidden></div>
+    <p class="section-label" style="margin-top:14px;">Affected Towns</p>
+    <p class="hint">Tap a town to see everything in it: sales leads, jobs, flags, stumps and contacts. Each town is outlined on every map.</p>
+    <div id="cityChips" class="city-chips"></div>
+    <div class="ac-wrap" style="margin:6px 0 14px;">
+      <div class="field" style="margin:0;"><input type="text" id="cityAddInput" autocomplete="off" placeholder="+ Add a city (e.g. Dyer, IN)"></div>
+      <div class="ac-list" id="acListCity"></div>
+    </div>
     <div class="pack-grid" id="packGrid"></div>
 
     <div id="hereWeather"></div>
@@ -674,6 +695,8 @@
 
   <!-- SALES VIEW -->
   <div class="view" id="view-sales">
+    <div class="city-pick"><label for="salesCity">City</label><select id="salesCity" class="small-btn"></select></div>
+    <div id="cityTotals"></div>
     <p class="section-label">Sales Territories</p>
     <p class="hint">Draw an area and give it to a salesperson so nobody knocks the same doors. Each person keeps one color.</p>
     <div class="btn-row" style="margin-bottom:6px;">
@@ -941,6 +964,13 @@
       <p>Gust dots are measured gusts: NWS storm reports plus today's peak gust at each weather station near you.</p>
       <p>There is no free live feed of utility outage counts, so this shows where outages are most likely, not the exact count. For exact numbers, use the utility outage map link below the list.</p>
     </details>
+  </div>
+
+  <div class="view" id="view-town">
+    <button class="small-btn" id="townBackBtn" type="button" style="margin-bottom:10px;">← All towns</button>
+    <div id="townHead"></div>
+    <div id="townMap" class="mini-map" style="height:300px;"></div>
+    <div id="townBody"></div>
   </div>
 
   <div class="view" id="view-debris">
@@ -1254,6 +1284,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab === 'here') renderCities();
     if(btn.dataset.tab === 'here' && miniMaps.hereMiniMap) setTimeout(()=>miniMaps.hereMiniMap.invalidateSize(), 50);
     if(btn.dataset.tab === 'affected') openAffected();
     if(btn.dataset.tab === 'debris') openDebris();
@@ -1375,6 +1406,8 @@ async function loadAll(){
   properties= await getJSON('properties', []);
   marks     = await getJSON('marks', []);
   zones     = await getJSON('zones', []);
+  cities    = await getJSON('cities', []);
+  activeCity = await getJSON('activeCity', 'all');
   territories = await getJSON('territories', []);
   areas     = await getJSON('areas', []);
   currentAreaId = await getJSON('currentArea', null);
@@ -1864,7 +1897,9 @@ function renderGov(){
 function renderSales(){
   const results = document.getElementById('salesResults');
   if(!leads.length){ results.innerHTML = `<div class="empty-state">No leads logged yet.<br>Check the outage maps above, then tap "+ Add Lead".</div>`; return; }
-  let list = leads.slice();
+  let list = leads.filter(l=> l.lat == null ? activeCity === 'all' : inActiveCity(l.lat, l.lng));
+  renderCityTotals();
+  if(!list.length){ results.innerHTML = `<div class="empty-state">No leads in ${escapeHtml((cities.find(c=>c.id === activeCity) || {}).name || 'this city')} yet.</div>`; return; }
   if(userLoc){ list = list.map(l=>({...l, dist: l.lat!=null ? distMiles(userLoc.lat,userLoc.lng,l.lat,l.lng) : null})).sort((a,b)=>(a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist)); }
   results.innerHTML = list.map((l,i)=>{
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
@@ -1877,7 +1912,7 @@ function renderSales(){
         <div class="dist-badge">${userLoc && l.dist!=null ? l.dist.toFixed(1) : '—'}<small>${userLoc && l.dist!=null?'MI':''}</small></div>
         <div class="card-body">
           <div class="card-name">${escapeHtml(l.name)} <span class="status-pill ${pillClass}">${l.status}</span></div>
-          <div class="card-sub">${escapeHtml(l.address)}</div>
+          <div class="card-sub">${escapeHtml(l.address)}${(()=>{ const k = cityOf(l.lat, l.lng); return k ? ` · <span style="color:${k.color}">●</span> ${escapeHtml(k.name)}` : ''; })()}</div>
           <div class="card-sub">${ownerLine}${l.notes ? ' · '+escapeHtml(l.notes) : ''}</div>
         </div>
         <div class="card-actions">
@@ -2679,6 +2714,7 @@ function initMap(){
   }});
   new CenterCtl().addTo(leafletMap);
 
+  drawCityOutlines(leafletMap);
   leafletMap.on('click', e=>{ if(zoneDraft) addZonePoint(e); else onMapClick(e); });
   leafletMap.on('dragstart', ()=>{ myDotFollow = false; });
   refreshMapMarkers();
@@ -2725,8 +2761,11 @@ function miniMap(elId, lat, lng, rings, opts = {}){
   dropMiniMap(elId);
   const m = L.map(el, { zoomControl:true, attributionControl:false, scrollWheelZoom:false, zoomAnimation:false, fadeAnimation:false, markerZoomAnimation:false }).setView([lat, lng], 19);
   const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
-  L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
-  L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
+  if(opts.streets) L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(m);
+  else{
+    L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
+    L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
+  }
   // Only draw the lot if its outline is real lat/lng near the dot. A county
   // server that ignores the coordinate request sends feet or meters instead,
   // which used to throw the map off to the other side of the world.
@@ -2735,9 +2774,10 @@ function miniMap(elId, lat, lng, rings, opts = {}){
     try{ const b = lot.getBounds(); if(!b.contains([lat, lng])) m.fitBounds(b.extend([lat, lng]), { padding:[24,24], maxZoom:19 }); }catch(e){}
   }
   if(opts.acc && opts.acc > 8) L.circle([lat, lng], { radius: opts.acc, color:'#2f80ed', weight:1, fillColor:'#2f80ed', fillOpacity:.12, interactive:false }).addTo(m);
-  L.circleMarker([lat, lng], { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1, interactive:false }).addTo(m);
+  if(!opts.noDot) L.circleMarker([lat, lng], { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1, interactive:false }).addTo(m);
   if(opts.onTap) m.on('click', e=> opts.onTap(e.latlng.lat, e.latlng.lng));
   miniMaps[elId] = m;
+  if(elId === 'hereMiniMap') drawCityOutlines(m);
   setTimeout(()=>{ if(miniMaps[elId] === m) m.invalidateSize(); }, 60);
 }
 function ringsNear(rings, lat, lng){
@@ -2940,7 +2980,7 @@ document.getElementById('jobFilter').addEventListener('change', renderJobs);
 function renderJobs(){
   const results = document.getElementById('jobsResults');
   const filter = document.getElementById('jobFilter').value;
-  let list = jobs.slice();
+  let list = jobs.filter(j=> j.lat == null ? activeCity === 'all' : inActiveCity(j.lat, j.lng));
   if(filter){ list = list.filter(j=> j.status === filter || (filter === 'stump' && /stump/i.test(j.work || '')) || (filter === 'tree' && /tree/i.test(j.work || ''))); }
   if(!list.length){
     results.innerHTML = `<div class="empty-state">${jobs.length ? 'No jobs match that status.' : 'No jobs on the board yet.<br>Tap "+ Add Job" to log the first one.'}</div>`;
@@ -2954,7 +2994,7 @@ function renderJobs(){
       <div class="card">
         <div class="card-body">
           <div class="card-name">#${escapeHtml(j.number)} <span class="status-pill ${pillClass}" onclick="cycleJobStatus('${j.id}')" style="cursor:pointer;">${j.status}</span>${j.hazardsNote ? ' ⚠️' : ''}</div>
-          <div class="card-sub">${j.work ? (/stump/i.test(j.work) ? '🪵 ' : '🌳 ') + escapeHtml(j.work) + ' · ' : ''}${escapeHtml(j.address)}${j.crew ? ' · '+escapeHtml(j.crew) : ''}</div>
+          <div class="card-sub">${(()=>{ const k = cityOf(j.lat, j.lng); return k ? `<span style="color:${k.color}">●</span> ${escapeHtml(k.name)} · ` : ''; })()}${j.work ? (/stump/i.test(j.work) ? '🪵 ' : '🌳 ') + escapeHtml(j.work) + ' · ' : ''}${escapeHtml(j.address)}${j.crew ? ' · '+escapeHtml(j.crew) : ''}</div>
           ${j.hazardsNote ? `<div class="card-sub prio-High">Hazard: ${escapeHtml(j.hazardsNote)}</div>` : ''}
           ${j.notes ? `<div class="card-sub">${escapeHtml(j.notes)}</div>` : ''}
         </div>
@@ -3664,6 +3704,213 @@ function editOfficial(id){
   p.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
+
+// ========== ACTIVE CITIES ==========
+// The towns this storm covers. Each keeps its official boundary (Nominatim,
+// falling back to the Census TIGERweb places layer) so every map can outline
+// it, and leads, jobs and territories are counted by the city they fall in.
+let cities = [], activeCity = 'all';
+const CITY_COLORS = ['#ff7a1a','#2f80ed','#27ae60','#9b51e0','#e5242b','#00b8a9'];
+async function saveCities(){ await setJSON('cities', cities); await setJSON('activeCity', activeCity); }
+async function cityBoundary(name, state, lat, lng){
+  try{
+    const q = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&polygon_threshold=0.00005&limit=6&countrycodes=us&q=${encodeURIComponent(name + ', ' + state)}`;
+    const d = await fetchJSON(q, { headers:{ 'Accept':'application/json' } }, 15000);
+    const hit = (d || []).filter(r=> r.geojson && /Polygon/.test(r.geojson.type) && (r.category === 'boundary' || r.class === 'boundary' || r.type === 'administrative'))
+      .sort((a, b)=> (lat != null ? distMiles(lat, lng, +a.lat, +a.lon) - distMiles(lat, lng, +b.lat, +b.lon) : 0))[0];
+    if(hit) return { geom: hit.geojson, lat: +hit.lat, lng: +hit.lon, src:'OpenStreetMap' };
+  }catch(e){}
+  if(lat == null) return null;
+  // Census incorporated places (layer 28) and census-designated places (layer 30)
+  for(const layer of [28, 30, 4, 5]){
+    try{
+      const d = await fetchJSON(`https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/${layer}/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=NAME,BASENAME&outSR=4326&maxAllowableOffset=0.00005&f=geojson`, {}, 15000);
+      const f = (d.features || []).find(x=> new RegExp('^' + name.replace(/[^a-z ]/gi, '') , 'i').test((x.properties || {}).BASENAME || (x.properties || {}).NAME || ''));
+      if(f && f.geometry) return { geom: f.geometry, lat, lng, src:'US Census' };
+    }catch(e){}
+  }
+  return null;
+}
+async function addCity(name, state, lat, lng){
+  name = bareTown(name);
+  if(cities.some(c=> c.name.toLowerCase() === name.toLowerCase() && c.state.toLowerCase() === (state || '').toLowerCase())){ toast(name + ' is already on the list.'); return; }
+  const used = new Set(cities.map(c=>c.color));
+  const city = { id:'c_' + Date.now(), name, state: state || '', lat, lng, color: CITY_COLORS.find(c=>!used.has(c)) || CITY_COLORS[cities.length % CITY_COLORS.length], added: Date.now(), geom:null };
+  cities.push(city); await saveCities(); renderCities();
+  if(!navigator.onLine){ toast(`Added ${name}. Its outline loads when you have signal.`); return city; }
+  const b = await cityBoundary(name, state, lat, lng);
+  if(b){ city.geom = b.geom; city.src = b.src; if(city.lat == null){ city.lat = b.lat; city.lng = b.lng; } }
+  await saveCities(); renderCities(); redrawCityOutlines();
+  toast(b ? `${name} outlined.` : `Added ${name}, but no official boundary was found. Counts use a 2-mile circle.`);
+  return city;
+}
+async function removeCity(id){
+  const before = cities.slice(), prev = activeCity;
+  cities = cities.filter(c=>c.id !== id); if(activeCity === id) activeCity = 'all';
+  await saveCities(); renderCities(); redrawCityOutlines(); renderSales(); renderTerritories(); renderJobs();
+  toast('City removed.', async ()=>{ cities = before; activeCity = prev; await saveCities(); renderCities(); redrawCityOutlines(); renderSales(); renderTerritories(); renderJobs(); });
+}
+async function setActiveCity(id){
+  activeCity = id; await saveCities();
+  renderCities(); redrawCityOutlines(); renderSales(); renderTerritories(); renderJobs(); drawTerritories();
+  const c = cities.find(x=>x.id === id);
+  if(c && salesMap) try{ salesMap.fitBounds(cityLayerBounds(c), { padding:[16,16] }); }catch(e){}
+}
+function cityLayerBounds(c){ return c.geom ? L.geoJSON(c.geom).getBounds() : L.latLng(c.lat, c.lng).toBounds(6400); }
+function inGeom(lat, lng, g){
+  if(!g) return false;
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  return polys.some(rings=> pointInRings(lng, lat, rings));
+}
+function cityOf(lat, lng){
+  if(lat == null || lng == null) return null;
+  const hit = cities.find(c=> c.geom && inGeom(lat, lng, c.geom));
+  if(hit) return hit;
+  return cities.filter(c=> !c.geom && c.lat != null && distMiles(lat, lng, c.lat, c.lng) < 2)[0] || null;
+}
+function inActiveCity(lat, lng){
+  if(activeCity === 'all' || !cities.some(c=>c.id === activeCity)) return true;
+  const c = cityOf(lat, lng); return !!c && c.id === activeCity;
+}
+function terrCenter(t){ const n = t.points.length; return [t.points.reduce((s, p)=>s + p[0], 0) / n, t.points.reduce((s, p)=>s + p[1], 0) / n]; }
+// Outline every active city on a map; the selected one is drawn strongest.
+const cityLayers = new Map();
+function drawCityOutlines(map){
+  if(!map || typeof L === 'undefined') return;
+  let g = cityLayers.get(map);
+  if(!g){ g = L.layerGroup().addTo(map); cityLayers.set(map, g); }
+  g.clearLayers();
+  cities.forEach(c=>{
+    const sel = activeCity === c.id, dim = activeCity !== 'all' && !sel;
+    const style = { color: c.color, weight: sel ? 5 : 3, dashArray: sel ? null : '8 6', opacity: dim ? .45 : .95, fillColor: c.color, fillOpacity: sel ? .10 : dim ? .02 : .06, interactive:false };
+    const shape = c.geom ? L.geoJSON(c.geom, { style }) : (c.lat != null ? L.circle([c.lat, c.lng], { radius: 3200, ...style }) : null);
+    if(!shape) return;
+    shape.addTo(g);
+    if(c.lat != null) L.marker([c.lat, c.lng], { interactive:false, icon: L.divIcon({ className:'city-lbl', html:`<span style="border-color:${c.color}">${escapeHtml(c.name)}</span>`, iconSize:[0,0] }) }).addTo(g);
+  });
+}
+function redrawCityOutlines(){ [leafletMap, salesMap, affMap, miniMaps.hereMiniMap].forEach(m=>{ if(m) drawCityOutlines(m); }); }
+function renderCities(){
+  const el = document.getElementById('cityChips');
+  if(el) el.innerHTML = cities.length ? cities.map(c=>{
+      const t = townCounts(c);
+      return `<div class="card town-card" style="border-left:6px solid ${c.color}" onclick="openTown('${c.id}')">
+        <div class="card-body"><div class="card-name">${escapeHtml(c.name)}${c.state ? ', ' + escapeHtml(c.state) : ''}${c.geom ? '' : ' <small>(no outline)</small>'}</div>
+          <div class="card-sub wrap">${townCountLine(t)}</div></div>
+        <div class="card-actions"><button class="icon-btn" onclick="event.stopPropagation(); openTown('${c.id}')" aria-label="Open">›</button><button class="icon-btn del" onclick="event.stopPropagation(); removeCity('${c.id}')" aria-label="Remove">×</button></div></div>`;
+    }).join('') : '<div class="cat-empty">No towns yet. Add the towns this storm covers.</div>';
+  const sel = document.getElementById('salesCity');
+  if(sel){
+    sel.innerHTML = `<option value="all">All cities</option>` + cities.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}${c.state ? ', ' + escapeHtml(c.state) : ''}</option>`).join('');
+    sel.value = cities.some(c=>c.id === activeCity) ? activeCity : 'all';
+  }
+  renderCityTotals();
+}
+function renderCityTotals(){
+  const el = document.getElementById('cityTotals'); if(!el) return;
+  if(!cities.length){ el.innerHTML = ''; return; }
+  const row = (label, ls, ts, js)=>`<div>${label}</div><b>${ls.length}</b><b>${ls.filter(l=>l.status === 'Won').length}</b><b>${ts}</b>`;
+  const byCity = c=> leads.filter(l=>{ const k = cityOf(l.lat, l.lng); return c ? k && k.id === c.id : !k; });
+  const terrIn = c=> territories.filter(t=>{ const [y, x] = terrCenter(t), k = cityOf(y, x); return c ? k && k.id === c.id : !k; }).length;
+  const other = byCity(null);
+  el.innerHTML = `<div class="city-tot"><span class="h">City</span><span class="h">Leads</span><span class="h">Won</span><span class="h">Areas</span>
+    ${cities.map(c=>row(`<span style="color:${c.color}">●</span> ${escapeHtml(c.name)}`, byCity(c), terrIn(c))).join('')}
+    ${other.length || terrIn(null) ? row('Outside these cities', other, terrIn(null)) : ''}</div>`;
+}
+document.getElementById('salesCity').addEventListener('change', e=> setActiveCity(e.target.value));
+attachTownAutocomplete('cityAddInput', 'acListCity', pick=>{
+  const st = (pick.sub || '').split(',').map(x=>x.trim()).pop() || '';
+  document.getElementById('cityAddInput').value = '';
+  addCity(pick.name, STATE_CODES[st] || st, pick.lat, pick.lng);
+});
+
+// ---------- one town at a time ----------
+function inCity(c, lat, lng){ const k = cityOf(lat, lng); return !!k && k.id === c.id; }
+function townItems(c){
+  return {
+    leads: leads.filter(l=> inCity(c, l.lat, l.lng)),
+    jobs: jobs.filter(j=> inCity(c, j.lat, j.lng)),
+    marks: marks.filter(m=> inCity(c, m.lat, m.lng)),
+    terr: territories.filter(t=>{ const [y, x] = terrCenter(t); return inCity(c, y, x); }),
+    zones: zones.filter(z=>{ const n = z.points.length; return inCity(c, z.points.reduce((s,p)=>s+p[0],0)/n, z.points.reduce((s,p)=>s+p[1],0)/n); })
+  };
+}
+function townCounts(c){
+  const t = townItems(c);
+  return { jobs: t.jobs.length, open: t.jobs.filter(j=>j.status !== 'Completed').length, leads: t.leads.length, won: t.leads.filter(l=>l.status === 'Won').length,
+    trees: t.marks.filter(m=>m.type === 'tree').length, stumps: t.marks.filter(m=>m.type === 'stump').length, stay: t.marks.filter(m=>m.type === 'stay').length,
+    roads: t.marks.filter(m=>m.type === 'road').length, terr: t.terr.length };
+}
+function townCountLine(t){
+  const bits = [`${t.jobs} job${t.jobs === 1 ? '' : 's'}${t.open && t.open !== t.jobs ? ` (${t.open} open)` : ''}`, `${t.leads} sale lead${t.leads === 1 ? '' : 's'}${t.won ? ` (${t.won} won)` : ''}`];
+  if(t.trees) bits.push(`${t.trees} tree${t.trees === 1 ? '' : 's'} down`);
+  if(t.stumps) bits.push(`${t.stumps} stump${t.stumps === 1 ? '' : 's'}`);
+  if(t.stay) bits.push(`${t.stay} stay-away`);
+  if(t.roads) bits.push(`${t.roads} road${t.roads === 1 ? '' : 's'} closed`);
+  if(t.terr) bits.push(`${t.terr} sales area${t.terr === 1 ? '' : 's'}`);
+  return bits.join(' · ');
+}
+let openTownId = null;
+async function openTown(id){
+  const c = cities.find(x=>x.id === id); if(!c) return;
+  openTownId = id;
+  await setActiveCity(id);
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-town').classList.add('active');
+  window.scrollTo(0, 0);
+  renderTown();
+}
+function renderTown(){
+  const c = cities.find(x=>x.id === openTownId); if(!c) return;
+  const t = townItems(c), n = townCounts(c);
+  document.getElementById('townHead').innerHTML = `<div class="area-card" style="border-left-color:${c.color}"><p class="eyebrow" style="margin:0 0 4px;">Affected town</p>
+    <div class="area-name">${escapeHtml(c.name)}${c.state ? ', ' + escapeHtml(c.state) : ''}</div><div class="area-sub">${townCountLine(n)}</div>
+    <div class="btn-row" style="margin-top:8px;"><button class="small-btn go" onclick="townContacts('${c.id}')">📞 Who to call in ${escapeHtml(c.name)}</button><button class="small-btn" onclick="document.querySelector('.tab[data-tab=\\'sales\\']').click()">🏷️ Sales map</button></div></div>`;
+  // map with the outline and every pin in town
+  dropMiniMap('townMap');
+  if(typeof L !== 'undefined'){
+    miniMap('townMap', c.lat, c.lng, null, { streets:true, noDot:true });
+    const m = miniMaps.townMap;
+    if(m){
+      drawCityOutlines(m);
+      t.leads.forEach(l=> L.circleMarker([l.lat, l.lng], { radius:6, color:'#fff', weight:2, fillColor:'#3e7cb1', fillOpacity:1 }).bindPopup(escapeHtml(l.name + ' · ' + l.status)).addTo(m));
+      t.jobs.forEach(j=> L.circleMarker([j.lat, j.lng], { radius:7, color:'#fff', weight:2, fillColor:'#e8590c', fillOpacity:1 }).bindPopup('Job #' + escapeHtml(j.number)).addTo(m));
+      t.marks.forEach(k=> L.marker([k.lat, k.lng], { icon: L.divIcon({ className:'aff-pin', html:(MARK_TYPES[k.type] || MARK_TYPES.note).icon, iconSize:[24,24] }) }).bindPopup(escapeHtml((MARK_TYPES[k.type] || MARK_TYPES.note).label + (k.note ? ': ' + k.note : ''))).addTo(m));
+      try{ m.fitBounds(cityLayerBounds(c), { padding:[10,10] }); }catch(e){}
+    }
+  }
+  const sec = (title, items, row)=> `<div class="town-sec"><p class="section-label">${title} (${items.length})</p>${items.length ? items.map(row).join('') : '<div class="cat-empty">None yet.</div>'}</div>`;
+  const mapBtn = (y, x)=> `<a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${y},${x}" target="_blank" rel="noopener" aria-label="Map">📍</a>`;
+  const sold = { Won:0, 'Bid Sent':1, Contacted:2, New:3, Lost:4 };
+  document.getElementById('townBody').innerHTML =
+    sec('Sale Leads', t.leads.slice().sort((a, b)=>(sold[a.status] ?? 9) - (sold[b.status] ?? 9)), l=>`<div class="card"><div class="card-body"><div class="card-name">${escapeHtml(l.name)} <span class="status-pill status-${l.status.replace(' ','-')}">${l.status}</span></div><div class="card-sub wrap">${escapeHtml(l.address || '')}${l.owner ? ' · Owner: ' + escapeHtml(l.owner) : ''}</div></div><div class="card-actions">${mapBtn(l.lat, l.lng)}${l.phone ? `<a class="icon-btn call" href="tel:${l.phone.replace(/[^0-9+]/g,'')}">📞</a>` : ''}</div></div>`)
+    + sec('Jobs', t.jobs, j=>`<div class="card"><div class="card-body"><div class="card-name">#${escapeHtml(j.number)} <span class="status-pill status-${j.status.replace(' ','-')}">${j.status}</span></div><div class="card-sub wrap">${j.work ? escapeHtml(j.work) + ' · ' : ''}${escapeHtml(j.address || '')}${j.crew ? ' · ' + escapeHtml(j.crew) : ''}</div></div><div class="card-actions">${mapBtn(j.lat, j.lng)}</div></div>`)
+    + sec('Flags, Trees &amp; Stumps', t.marks.slice().sort((a, b)=> (b.time || 0) - (a.time || 0)), k=>{ const T = MARK_TYPES[k.type] || MARK_TYPES.note; return `<div class="card"><div class="card-body"><div class="card-name">${T.icon} ${escapeHtml(T.label)}</div><div class="card-sub wrap">${escapeHtml(k.address || '')}${k.note ? ' · ' + escapeHtml(k.note) : ''}</div><div class="fresh">${k.time ? timeAgo(k.time) : ''}</div></div><div class="card-actions">${mapBtn(k.lat, k.lng)}</div></div>`; })
+    + sec('Sales Areas', t.terr, x=>`<div class="card"><span class="terr-sw" style="background:${x.color || repColor(x.rep)}"></span><div class="card-body"><div class="card-name">${escapeHtml(x.name)}</div><div class="card-sub">${escapeHtml(x.rep || 'Unassigned')} · ${leadsIn(x).length} leads</div></div></div>`)
+    + (t.zones.length ? sec('Search &amp; Outage Zones', t.zones, z=>`<div class="card"><span class="terr-sw" style="background:${z.color}"></span><div class="card-body"><div class="card-name">${escapeHtml(z.name)}</div><div class="card-sub">${escapeHtml(z.worker || 'Unassigned')} · ${escapeHtml(z.status || '')}</div></div></div>`) : '');
+}
+function townContacts(id){
+  const c = cities.find(x=>x.id === id); if(!c) return;
+  const a = areas.find(x=> bareTown(x.town).toLowerCase() === c.name.toLowerCase());
+  document.querySelector('.tab[data-tab="contacts"]').click();
+  if(a){ switchArea(a.id); } else if(c.lat != null){ arriveAt(c.lat, c.lng, c.name, { src:'typed' }); }
+}
+document.getElementById('townBackBtn').addEventListener('click', async ()=>{
+  openTownId = null; await setActiveCity('all');
+  document.querySelector('.tab[data-tab="here"]').click();
+  document.getElementById('cityChips').scrollIntoView({ block:'center' });
+});
+
+// First run: start with the trial towns so the outline can be checked; they
+// can be removed like any other city.
+async function seedCities(){
+  if(cities.length || !navigator.onLine || await getJSON('citiesSeeded', false)) return;
+  await setJSON('citiesSeeded', true);
+  await addCity('Lansing', 'IL', 41.5648, -87.5389);
+  await addCity('Dyer', 'IN', 41.4942, -87.5217);
+}
+
 // ========== SALES TERRITORIES ==========
 // Drawn on the Sales tab's own map. Each salesperson gets one color across
 // all their areas; leads inside each territory are counted.
@@ -3683,6 +3930,7 @@ function openSalesMap(){
     salesBase.streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' }).addTo(salesMap);
     salesBase.sat = L.layerGroup([L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagery &copy; Esri' }), L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 })]);
     salesLayers = L.layerGroup().addTo(salesMap);
+    drawCityOutlines(salesMap);
     salesMap.on('click', e=>{ if(terrDraft) addTerrPoint(e.latlng.lat, e.latlng.lng); });
   }
   setTimeout(()=>salesMap.invalidateSize(), 60);
@@ -3770,13 +4018,14 @@ function drawTerritories(){
   if(!salesMap) return;
   salesLayers.clearLayers();
   territories.forEach(t=>{
+    const [cy, cx] = terrCenter(t); if(!inActiveCity(cy, cx)) return;
     const col = t.color || repColor(t.rep);
     L.polygon(t.points, { color: col, weight:3, fillColor: col, fillOpacity:.22 })
       .bindTooltip(`${escapeHtml(t.rep || 'Unassigned')}: ${escapeHtml(t.name)}`, { permanent:true, direction:'center', className:'terr-lbl' })
       .on('click', e=>{ if(terrDraft){ addTerrPoint(e.latlng.lat, e.latlng.lng); return; } openTerrForm(t); })
       .addTo(salesLayers);
   });
-  leads.filter(l=>l.lat != null).forEach(l=>{
+  leads.filter(l=>l.lat != null && inActiveCity(l.lat, l.lng)).forEach(l=>{
     L.circleMarker([l.lat, l.lng], { radius:6, color:'#fff', weight:2, fillColor:'#3e7cb1', fillOpacity:1 })
       .bindPopup(`<div class="popup-title">${escapeHtml(l.name)}</div>${escapeHtml(l.address || '')}<br>${escapeHtml(l.status || '')}`).addTo(salesLayers);
   });
@@ -3794,11 +4043,13 @@ function renderTerritories(){
   const el = document.getElementById('terrList'); if(!el) return;
   if(!territories.length){ el.innerHTML = '<div class="cat-empty">No territories yet. Tap Draw Territory to make the first one.</div>'; return; }
   const byRep = {};
-  territories.forEach(t=> (byRep[t.rep || 'Unassigned'] = byRep[t.rep || 'Unassigned'] || []).push(t));
+  const shownT = territories.filter(t=>{ const [y, x] = terrCenter(t); return inActiveCity(y, x); });
+  if(!shownT.length){ el.innerHTML = '<div class="cat-empty">No territories in this city yet. Tap Draw Territory.</div>'; return; }
+  shownT.forEach(t=> (byRep[t.rep || 'Unassigned'] = byRep[t.rep || 'Unassigned'] || []).push(t));
   el.innerHTML = Object.entries(byRep).map(([rep, ts])=>`<div class="terr-rep"><span class="terr-sw" style="background:${ts[0].color || repColor(rep)}; margin:0;"></span>${escapeHtml(rep)} · ${ts.length} area${ts.length > 1 ? 's' : ''}</div>` + ts.map(t=>{
     const n = leadsIn(t).length;
     return `<div class="card"><span class="terr-sw" style="background:${t.color || repColor(t.rep)}"></span>
-      <div class="card-body"><div class="card-name">${escapeHtml(t.name)}</div><div class="card-sub wrap">${n} lead${n === 1 ? '' : 's'} inside${t.notes ? ' · ' + escapeHtml(t.notes) : ''}</div></div>
+      <div class="card-body"><div class="card-name">${escapeHtml(t.name)}</div><div class="card-sub wrap">${(()=>{ const [y, x] = terrCenter(t), k = cityOf(y, x); return k ? escapeHtml(k.name) + ' · ' : ''; })()}${n} lead${n === 1 ? '' : 's'} inside${t.notes ? ' · ' + escapeHtml(t.notes) : ''}</div></div>
       <div class="card-actions"><button class="icon-btn" onclick="zoomTerritory('${t.id}')" aria-label="Show on map">🔍</button><button class="icon-btn" onclick="openTerrForm(territories.find(x=>x.id==='${t.id}'))" aria-label="Edit">✏️</button></div></div>`;
   }).join('')).join('') + '<button class="small-btn" style="display:block; width:100%; margin-top:8px;" onclick="shareTerritories()">📤 Send territories to the crew</button>';
 }
@@ -4004,6 +4255,7 @@ function openAffected(){
     affLayers.zones = L.layerGroup().addTo(affMap);
     affLayers.me = L.layerGroup().addTo(affMap);
     affLayers.roads = L.layerGroup().addTo(affMap);
+    drawCityOutlines(affMap);
     [['affShowOut','out'],['affShowGust','gust'],['affShowZones','zones'],['affShowRoads','roads']].forEach(([id,k])=>{
       const cb = document.getElementById(id);
       cb.addEventListener('change', ()=>{ cb.checked ? affMap.addLayer(affLayers[k]) : affMap.removeLayer(affLayers[k]); cb.parentElement.classList.toggle('on', cb.checked); });
@@ -4932,6 +5184,7 @@ function renderHere(){
   document.getElementById('hereCallList').innerHTML = callListHtml(a);
   renderChecklist();
   renderHereWeather();
+  renderCities();
   const sa = document.getElementById('savedAreas');
   sa.innerHTML = areas.length ? areas.map(x=>`
     <div class="card area-row${x.id===currentAreaId ? ' current' : ''}" onclick="switchArea('${x.id}')">
@@ -5241,7 +5494,9 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && dataL
     const meta = await getJSON('parcelsMeta:' + a.id, null);
     if(meta) a.parcelCount = meta.count;
   }
+  renderCities();
   await onAppOpen();
+  seedCities();
 })();
 </script>
 </body>
