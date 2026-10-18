@@ -1,0 +1,17 @@
+{
+  "name": "Storm Ops — Bedwell Field Ops",
+  "short_name": "Storm Ops",
+  "description": "Who to call, shops, property owners, zones and storm damage for storm tree work. Works with no signal.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16191c",
+  "theme_color": "#16191c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
