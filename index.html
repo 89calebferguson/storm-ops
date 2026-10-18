@@ -362,6 +362,9 @@
   .center-me-btn{ width:40px; height:40px; border-radius:6px; border:2px solid rgba(0,0,0,.25); background:#fff; color:#1f6fd6; font-size:24px; line-height:1; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.3); }
   .mini-map{ height:230px; border-radius:8px; overflow:hidden; border:1px solid var(--line); margin:10px 0; background:var(--panel); }
   .mini-cap{ font-size:12px; color:var(--text-dim); margin:-4px 0 10px; }
+  .fix-line{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-top:6px; }
+  .fix-line a{ color:var(--accent); }
+  .diag-out{ white-space:pre-wrap; font-family:var(--font-mono); font-size:11px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px; margin-top:8px; text-align:left; }
   .wind-now{ display:flex; gap:14px; align-items:center; background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--accent); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
   .wind-now.wind-warn{ border-left-color:#e0a100; } .wind-now.wind-danger{ border-left-color:var(--danger); }
   .wind-dial{ width:58px; height:58px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--accent); flex:none; }
@@ -1224,17 +1227,30 @@ function getLocation(statusEl, onDone, opts = {}){
   };
   if(!navigator.geolocation){ fallback('This browser has no GPS access.'); return; }
   statusEl.textContent = 'Getting a GPS fix…'; statusEl.className='status-line';
-  const ok = pos=>{
-    userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
-    statusEl.textContent = 'Location locked' + (pos.coords.accuracy ? ` (within ${Math.round(pos.coords.accuracy * 3.28)} ft)` : '') + '.'; statusEl.className='status-line ok';
+  // Watch for up to 20 s and keep the most accurate reading; stop early once
+  // it's good to about 50 ft. The first reading a phone gives is often a
+  // rough cell-tower fix that can be blocks or miles off.
+  let best = null, done = false, wid = null;
+  const finish = ()=>{
+    if(done) return; done = true;
+    if(wid !== null) navigator.geolocation.clearWatch(wid);
+    clearTimeout(timer);
+    if(!best){ fallback('GPS didn\'t get a fix.'); return; }
+    const c = best.coords, ft = Math.round((c.accuracy || 0) * 3.28);
+    userLoc = { lat: c.latitude, lng: c.longitude, acc: c.accuracy };
+    const weak = c.accuracy > 60;
+    statusEl.textContent = weak ? `Weak GPS fix (within about ${ft.toLocaleString()} ft), so the spot may be off. Tap the right house on the map below to fix it.` : `Location locked (within ${ft} ft).`;
+    statusEl.className = 'status-line ' + (weak ? 'warn' : 'ok');
     onDone();
   };
-  navigator.geolocation.getCurrentPosition(ok, err=>{
-    if(err && err.code === 1){ fallback('Location permission is blocked for this app.'); return; }
-    statusEl.textContent = 'Still looking for GPS…';
-    navigator.geolocation.getCurrentPosition(ok, e2=> fallback(e2 && e2.code === 1 ? 'Location permission is blocked for this app.' : 'GPS didn\'t get a fix.'),
-      { enableHighAccuracy:false, timeout:15000, maximumAge:300000 });
-  }, { enableHighAccuracy:true, timeout:25000, maximumAge:30000 });
+  const timer = setTimeout(finish, opts.precise ? 20000 : 12000);
+  wid = navigator.geolocation.watchPosition(pos=>{
+    if(!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+    statusEl.textContent = `Getting a GPS fix… (within ${Math.round(best.coords.accuracy * 3.28).toLocaleString()} ft so far)`;
+    if(best.coords.accuracy <= 15) finish();
+  }, err=>{
+    if(err && err.code === 1){ done = true; clearTimeout(timer); if(wid !== null) navigator.geolocation.clearWatch(wid); fallback('Location permission is blocked for this app.'); }
+  }, { enableHighAccuracy:true, maximumAge:0, timeout:20000 });
 }
 
 // ---------- storage ----------
@@ -1947,7 +1963,7 @@ document.getElementById('connTestBtn').addEventListener('click', async ()=>{
   const tests = [
     ['Map library (Leaflet)', ()=> typeof L !== 'undefined' ? Promise.resolve('loaded') : Promise.reject(new Error('not loaded'))],
     ['Town lookup (Photon)',  async ()=>{ const r = await fetch('https://photon.komoot.io/api?q=lansing&limit=1'); const j = await r.json(); return (j.features||[]).length + ' result(s)'; }],
-    ['Nearby search (Overpass)', async ()=>{ const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent('[out:json][timeout:10];node["amenity"="fuel"](around:5000,41.5648,-87.5389);out 1;') }); const j = await r.json(); return 'HTTP ' + r.status + ', ' + (j.elements||[]).length + ' result(s)'; }],
+    ['Nearby search (Overpass)', async ()=>{ const r = await fetch(OVERPASS_SERVERS[0], { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body:'data=' + encodeURIComponent('[out:json][timeout:10];node["amenity"="fuel"](around:5000,41.5648,-87.5389);out 1;') }); const j = await r.json(); return 'HTTP ' + r.status + ', ' + (j.elements||[]).length + ' result(s)'; }],
     ['Approx location (ipwho)', async ()=>{ const r = await fetch('https://ipwho.is/'); const j = await r.json(); return j.city ? j.city + ', ' + j.region : 'no city'; }],
     ['Storm reports (NWS/IEM)', async ()=>{ const r = await fetch('https://mesonet.agron.iastate.edu/geojson/lsr.geojson?states=IL&hours=72'); const j = await r.json(); return (j.features||[]).length + ' report(s)'; }],
     ['GPS permission', ()=> new Promise((res,rej)=>{ if(!navigator.geolocation) return rej(new Error('unsupported')); navigator.geolocation.getCurrentPosition(()=>res('granted'), e=>rej(new Error(e.message)), {timeout:6000}); })]
@@ -2590,7 +2606,7 @@ function centerOnMe(){
 // they're at the right house when it has no number on it. Tiles are saved by
 // the service worker, so a spot seen once still shows with no signal.
 const miniMaps = {};
-function miniMap(elId, lat, lng, rings){
+function miniMap(elId, lat, lng, rings, opts = {}){
   const el = document.getElementById(elId);
   if(!el || typeof L === 'undefined'){ if(el) el.innerHTML = '<div class="cat-empty">Map needs signal the first time.</div>'; return; }
   dropMiniMap(elId);
@@ -2598,13 +2614,22 @@ function miniMap(elId, lat, lng, rings){
   const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
   L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
   L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(m);
-  if(rings && rings.length){
-    const lot = L.polygon(rings.map(r=>r.map(([x,y])=>[y,x])), { color:'#ff7a1a', weight:3, fillOpacity:.08 }).addTo(m);
-    try{ m.fitBounds(lot.getBounds(), { padding:[24,24], maxZoom:19 }); }catch(e){}
+  // Only draw the lot if its outline is real lat/lng near the dot. A county
+  // server that ignores the coordinate request sends feet or meters instead,
+  // which used to throw the map off to the other side of the world.
+  if(ringsNear(rings, lat, lng)){
+    const lot = L.polygon(rings.map(r=>r.map(([x,y])=>[y,x])), { color:'#ff7a1a', weight:3, fillOpacity:.08, interactive:false }).addTo(m);
+    try{ const b = lot.getBounds(); if(!b.contains([lat, lng])) m.fitBounds(b.extend([lat, lng]), { padding:[24,24], maxZoom:19 }); }catch(e){}
   }
-  L.circleMarker([lat, lng], { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).addTo(m);
+  if(opts.acc && opts.acc > 8) L.circle([lat, lng], { radius: opts.acc, color:'#2f80ed', weight:1, fillColor:'#2f80ed', fillOpacity:.12, interactive:false }).addTo(m);
+  L.circleMarker([lat, lng], { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1, interactive:false }).addTo(m);
+  if(opts.onTap) m.on('click', e=> opts.onTap(e.latlng.lat, e.latlng.lng));
   miniMaps[elId] = m;
   setTimeout(()=>{ if(miniMaps[elId] === m) m.invalidateSize(); }, 60);
+}
+function ringsNear(rings, lat, lng){
+  if(!rings || !rings.length || !rings[0] || !rings[0].length) return false;
+  return rings.every(r=>r.every(([x,y])=> Math.abs(x) <= 180 && Math.abs(y) <= 90 && Math.abs(y - lat) < 0.05 && Math.abs(x - lng) < 0.05));
 }
 function dropMiniMap(elId){ if(miniMaps[elId]){ try{ miniMaps[elId].remove(); }catch(e){} delete miniMaps[elId]; } }
 
@@ -2740,6 +2765,7 @@ async function onMapClick(e){
   const { lat, lng } = e.latlng;
   const popup = L.popup().setLatLng(e.latlng).setContent('<div class="popup-title">Looking up…</div>').openOn(leafletMap);
   const r = await ownerLookupCore(lat, lng);
+  r.acc = acc;
   lastOwnerResult = r;
   const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   const rows = parcelRows(r.p);
@@ -3503,6 +3529,7 @@ function withTimeout(promise, ms){ return Promise.race([promise, new Promise((_,
 // Overpass (open map search) is free but its main server is often busy,
 // especially on phone carriers where many people share one address. Try the
 // public mirrors in turn before giving up.
+const APP_BUILD = '3.2';
 const OVERPASS_SERVERS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -3575,7 +3602,7 @@ async function addressAt(lat, lng){
   }catch(e){ return ''; }
 }
 
-async function arriveAt(lat, lng, label){
+async function arriveAt(lat, lng, label, fix = {}){
   setStatus('hereStatus', 'Working out where you are…');
   let place = null;
   if(navigator.onLine){ try{ place = await reverseGeocode(lat, lng); }catch(e){} }
@@ -3594,9 +3621,9 @@ async function arriveAt(lat, lng, label){
     area = { id:'area_' + Date.now(), created: Date.now(), offices:[], utility:[] };
     areas.unshift(area);
   }
-  Object.assign(area, place, { lat, lng });
+  Object.assign(area, place, { lat, lng, fix: { lat, lng, acc: fix.acc || null, src: fix.src || 'gps', time: Date.now() } });
   currentAreaId = area.id;
-  userLoc = { lat, lng };
+  userLoc = { lat, lng, acc: fix.acc };
   await saveAreas();
   renderHere(); renderContacts();
   if(navigator.onLine) await refreshArea(area, { force:true });
@@ -3700,7 +3727,12 @@ async function findOffices(lat, lng){
   for(const q of queries){
     try{ const d = await overpass(q, 30000); els.push(...(d.elements || [])); }catch(e){ errs.push(e); }
   }
-  if(errs.length === queries.length) throw errs[0];
+  if(!els.length){
+    // Overpass down or blocked: ask Nominatim (same open map, different server).
+    const nom = await officesFromNominatim(lat, lng).catch(()=>[]);
+    if(nom.length) return nom;
+    if(errs.length === queries.length) throw errs[0];
+  }
   const seen = new Set();
   return els.map(el=>{
     const la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon);
@@ -3716,6 +3748,31 @@ async function findOffices(lat, lng){
       lat: la, lng: lo, dist: distMiles(lat, lng, la, lo)
     };
   }).filter(Boolean).sort((a,b)=>a.dist-b.dist).slice(0, 200);
+}
+
+const NOMINATIM_OFFICE_TERMS = ['town hall', 'police', 'sheriff', 'fire station', 'courthouse', 'county'];
+async function officesFromNominatim(lat, lng){
+  const dLat = 0.35, dLng = 0.35 / Math.cos(lat * Math.PI/180); // ~25 mi box
+  const vb = [lng - dLng, lat + dLat, lng + dLng, lat - dLat].map(v=>v.toFixed(4)).join(',');
+  const out = [], seen = new Set();
+  for(const term of NOMINATIM_OFFICE_TERMS){
+    try{
+      const d = await fetchJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(term)}&viewbox=${vb}&bounded=1&limit=40&extratags=1&addressdetails=1&countrycodes=us`, { headers:{ 'Accept':'application/json' } }, 12000);
+      (d || []).forEach(r=>{
+        const name = r.name || (r.display_name || '').split(',')[0];
+        const t = Object.assign({ name }, r.extratags || {}, r.category && r.type ? { [r.category]: r.type } : {});
+        if(!name || !(t.amenity === 'townhall' || t.amenity === 'police' || t.amenity === 'fire_station' || t.amenity === 'courthouse' || t.office === 'government' || /county|sheriff|village|city of|township/i.test(name))) return;
+        if(t.highway || t.place || t.boundary) return;
+        const la = parseFloat(r.lat), lo = parseFloat(r.lon), key = name + '_' + la.toFixed(3);
+        if(seen.has(key)) return; seen.add(key);
+        const ad = r.address || {};
+        out.push({ name, group: officeGroupFor(t), phone: t.phone || t['contact:phone'] || '', web: t.website || t['contact:website'] || '',
+          address: [ad.house_number, ad.road, ad.city || ad.town || ad.village].filter(Boolean).join(' '), lat: la, lng: lo, dist: distMiles(lat, lng, la, lo) });
+      });
+    }catch(e){}
+    await new Promise(r=>setTimeout(r, 1100)); // Nominatim allows one request a second
+  }
+  return out.sort((a,b)=>a.dist-b.dist);
 }
 
 // ---------- electric utility ----------
@@ -3913,11 +3970,11 @@ function parcelProblem(r){
 function gisSearchUrl(county, state){ return `https://www.google.com/search?q=${encodeURIComponent((county ? county + ' County ' : '') + (state || '') + ' GIS parcel map property owner search')}`; }
 function assessorSearchUrl(county, state){ return `https://www.google.com/search?q=${encodeURIComponent((county ? county + ' County ' : '') + (state || '') + ' assessor property search')}`; }
 
-async function runOwnerLookup(lat, lng){
+async function runOwnerLookup(lat, lng, acc){
   setStatus('ownerStatus', 'Checking county property records…');
   dropMiniMap('ownerMiniMap');
   document.getElementById('ownerResult').innerHTML = '<div class="owner-card"><div class="mini-map" id="ownerMiniMap"></div><p class="mini-cap">Checking this spot…</p></div>';
-  miniMap('ownerMiniMap', lat, lng, null);
+  miniMap('ownerMiniMap', lat, lng, null, { acc });
   const r = await ownerLookupCore(lat, lng);
   lastOwnerResult = r;
   renderOwnerResult(r);
@@ -3936,7 +3993,7 @@ function renderOwnerResult(r){
       <p class="eyebrow" style="margin:0 0 4px;">${escapeHtml(place || 'Property')}</p>
       <div class="owner-name">${escapeHtml(owner || (rows.length ? 'Owner not published' : 'No record found'))}</div>
       <div class="mini-map" id="ownerMiniMap"></div>
-      <p class="mini-cap">${r.street ? 'Map address: ' + escapeHtml(r.street) + ' · ' : ''}Blue dot is the spot checked${r.p && r.p.rings ? ', orange line is the lot' : ''}. <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${r.lat},${r.lng}" target="_blank" rel="noopener">Street View</a></p>
+      <p class="mini-cap">${r.street ? 'Map address: ' + escapeHtml(r.street) + ' · ' : ''}Blue dot is the spot checked${r.acc ? ` (GPS within ${Math.round(r.acc * 3.28).toLocaleString()} ft${r.acc > 60 ? ', weak fix' : ''})` : ''}${ringsNear(r.p && r.p.rings, r.lat, r.lng) ? ', orange line is the lot' : ''}. <b>Wrong house? Tap the right one on this map.</b> <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${r.lat},${r.lng}" target="_blank" rel="noopener">Street View</a></p>
       ${rows.length ? `<dl class="kv">${rows.filter(([k])=>k!=='Owner').map(([k,v])=>`<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : `<p class="card-sub wrap" style="margin:0 0 10px;">${escapeHtml(parcelProblem(r))}</p>`}
       <div class="btn-row">
         ${rows.length ? `<button class="small-btn go" onclick="saveLastOwner()">Save to Log</button><button class="small-btn" onclick="leadFromLastOwner()">Make a Lead</button>` : ''}
@@ -3945,7 +4002,7 @@ function renderOwnerResult(r){
         <a class="small-btn" href="${assessorSearchUrl(r.county, r.state)}" target="_blank" rel="noopener">Assessor</a>
       </div>
     </div>`;
-  miniMap('ownerMiniMap', r.lat, r.lng, r.p && r.p.rings);
+  miniMap('ownerMiniMap', r.lat, r.lng, r.p && r.p.rings, { acc: r.acc, onTap: (la, lo)=> runOwnerLookup(la, lo) });
 }
 function propertyFromResult(r){
   const v = k=> r.p && r.p[k] ? String(r.p[k].value) : '';
@@ -4008,7 +4065,7 @@ function renderProperties(){
 }
 document.getElementById('propFilter').addEventListener('input', renderProperties);
 document.getElementById('ownerHereBtn').addEventListener('click', ()=>{
-  getLocation(document.getElementById('ownerStatus'), ()=> runOwnerLookup(userLoc.lat, userLoc.lng), { precise:true });
+  getLocation(document.getElementById('ownerStatus'), ()=> runOwnerLookup(userLoc.lat, userLoc.lng, userLoc.acc), { precise:true });
 });
 document.getElementById('ownerAddrBtn').addEventListener('click', async ()=>{
   const addr = document.getElementById('ownerAddrInput').value.trim();
@@ -4093,11 +4150,16 @@ function callListHtml(a){
     ${nearest('sheriff').length ? '' : searchRow(co + ' Sheriff non-emergency', 'Road blocked, traffic control', `${co} ${st} sheriff non emergency number`, '')}</div>`;
   return html;
 }
+function fixLine(a){
+  const f = a.fix || { lat:a.lat, lng:a.lng };
+  const how = f.src === 'typed' ? 'Typed town center' : 'GPS';
+  return `<div class="fix-line">${how}: <a href="https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}" target="_blank" rel="noopener">${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}</a>${f.acc ? ` · within ${Math.round(f.acc * 3.28).toLocaleString()} ft` : ''}${f.time ? ' · ' + timeAgo(f.time) : ''}</div>`;
+}
 function renderHere(){
   const a = currentArea();
   document.getElementById('areaName').textContent = a ? [a.town, a.stateCode || a.state].filter(Boolean).join(', ') : 'No area set yet';
   document.getElementById('areaSub').innerHTML = a
-    ? `${escapeHtml(a.county ? a.county + ' County' : 'County unknown')}${a.township ? ' · ' + escapeHtml(a.township) : ''}<br>${freshness(a.refreshed, 'Everything')}`
+    ? `${escapeHtml(a.county ? a.county + ' County' : 'County unknown')}${a.township ? ' · ' + escapeHtml(a.township) : ''}<br>${freshness(a.refreshed, 'Everything')}${fixLine(a)}`
     : 'Tap the button when you arrive somewhere new. The app pulls local contacts, shops, the electric utility, and the county\'s property records, then keeps a copy on this phone for when you lose signal.';
   const grid = document.getElementById('packGrid');
   if(a){
@@ -4143,6 +4205,29 @@ async function updateOffices(area){
   }catch(e){ area.officesError = String(e && e.message || e); }
   area.officesLoading = false;
 }
+// Shows which free servers this phone can reach, so a screenshot tells us
+// whether it's the servers, the phone's network, or the app.
+async function testOfficeServers(btn){
+  const el = document.getElementById('officeDiag'); if(!el) return;
+  const a = currentArea(); const la = a ? a.lat : 41.5648, lo = a ? a.lng : -87.5389;
+  el.hidden = false; el.textContent = 'Testing…'; if(btn) btn.disabled = true;
+  const q = `[out:json][timeout:15];nwr["amenity"="townhall"](around:15000,${la},${lo});out center tags 5;`;
+  const lines = [];
+  for(const url of OVERPASS_SERVERS){
+    const t0 = Date.now();
+    try{
+      const r = await withTimeout(fetch(url, { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body:'data=' + encodeURIComponent(q) }), 20000);
+      const txt = await r.text(); let n = '?'; try{ n = (JSON.parse(txt).elements || []).length; }catch(e){ n = 'not JSON'; }
+      lines.push(`${r.ok ? 'OK  ' : 'FAIL'} ${new URL(url).host}: HTTP ${r.status}, ${n} hall(s), ${((Date.now()-t0)/1000).toFixed(1)}s`);
+    }catch(e){ lines.push(`FAIL ${new URL(url).host}: ${e.message || 'blocked'}`); }
+    el.textContent = lines.join('\n');
+  }
+  try{ const d = await fetchJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=town%20hall&viewbox=${lo-0.3},${la+0.3},${lo+0.3},${la-0.3}&bounded=1&limit=5`, {}, 15000); lines.push(`OK   nominatim: ${d.length} result(s)`); }
+  catch(e){ lines.push(`FAIL nominatim: ${e.message || 'blocked'}`); }
+  lines.push(`Online: ${navigator.onLine} · app ${APP_BUILD}`);
+  el.textContent = lines.join('\n');
+  if(btn) btn.disabled = false;
+}
 async function retryOffices(){
   const a = currentArea(); if(!a) return;
   if(!navigator.onLine){ toast('No signal right now.'); return; }
@@ -4182,7 +4267,7 @@ function renderContacts(){
 function officesEmptyText(a){
   if(!a) return 'No area loaded. Pick or load one on the Here tab.';
   if(a.officesLoading) return 'Searching the open map for offices near ' + escapeHtml(a.town || 'here') + '…';
-  const retry = ' <button class="small-btn" onclick="retryOffices()">Try again</button>';
+  const retry = ' <div class="btn-row" style="margin-top:8px;"><button class="small-btn go" onclick="retryOffices()">Try again</button><button class="small-btn" onclick="testOfficeServers(this)">Test the servers</button></div><pre class="diag-out" id="officeDiag" hidden></pre>';
   if(!navigator.onLine) return 'No signal and no offices saved for this area yet. They load the next time you have signal.';
   if(a.officesError === 'none') return 'The open map has no offices listed within 25 miles of here. Use the Who To Call list above.' + retry;
   if(a.officesError) return 'The map servers didn\'t answer (' + escapeHtml(a.officesError) + '). They get busy after storms.' + retry;
@@ -4242,7 +4327,7 @@ async function startParcelDownload(radius){
 
 // ---------- arrive / town search ----------
 document.getElementById('arriveBtn').addEventListener('click', ()=>{
-  getLocation(document.getElementById('hereStatus'), ()=> arriveAt(userLoc.lat, userLoc.lng));
+  getLocation(document.getElementById('hereStatus'), ()=> arriveAt(userLoc.lat, userLoc.lng, null, { acc: userLoc.acc, src:'gps' }), { precise:true });
 });
 function attachTownAutocomplete(inputId, listId, onPick){
   const input = document.getElementById(inputId), list = document.getElementById(listId);
@@ -4253,7 +4338,7 @@ function attachTownAutocomplete(inputId, listId, onPick){
     if(q.length < 2 || !navigator.onLine){ list.classList.remove('open'); return; }
     timer = setTimeout(async ()=>{
       try{
-        const d = await fetchJSON(`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8&lang=en&layer=city&layer=district&layer=locality`);
+        const d = await fetchJSON(`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8&lang=en&layer=city&layer=district&layer=locality${userLoc && !userLoc.approx ? `&lat=${userLoc.lat.toFixed(3)}&lon=${userLoc.lng.toFixed(3)}` : ''}`);
         results = (d.features||[]).filter(f=>(f.properties||{}).countrycode==='US').map(f=>({
           name:(f.properties||{}).name||'', sub:[(f.properties||{}).county,(f.properties||{}).state].filter(Boolean).join(', '),
           lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0] }));
@@ -4284,7 +4369,7 @@ function attachTownAutocomplete(inputId, listId, onPick){
     if(loc) onPick({ name:q, lat:loc.lat, lng:loc.lng }); else toast('Town not found. Add the state.');
   });
 }
-attachTownAutocomplete('hereTownInput', 'acListHere', pick=> arriveAt(pick.lat, pick.lng, pick.name));
+attachTownAutocomplete('hereTownInput', 'acListHere', pick=> arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }));
 
 // ---------- backup / restore ----------
 document.getElementById('exportBtn').addEventListener('click', async ()=>{
@@ -4354,6 +4439,27 @@ async function onAppOpen(){
     if(!liveResults.length) await findEverything();
     if(navigator.onLine){ refreshArea(a); retryPendingGeocodes(); }
   }
+  checkMovedAway();
+}
+// When the app opens somewhere new, the saved working area can be a different
+// town. If location is already allowed, check quietly and offer to switch.
+async function checkMovedAway(){
+  const a = currentArea();
+  try{
+    if(!navigator.geolocation || !navigator.permissions) return;
+    const perm = await navigator.permissions.query({ name:'geolocation' });
+    if(perm.state !== 'granted') return;
+  }catch(e){ return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const c = pos.coords;
+    if(c.accuracy > 2000) return;
+    const d = a ? distMiles(c.latitude, c.longitude, a.lat, a.lng) : Infinity;
+    if(d < 8) return;
+    const el = document.getElementById('hereStatus');
+    el.className = 'status-line warn';
+    el.innerHTML = `${a ? `You're about ${Math.round(d)} miles from ${escapeHtml(a.town || 'the working area')}.` : 'No working area loaded yet.'} <button class="small-btn go" id="moveHereBtn">Load where I am now</button>`;
+    document.getElementById('moveHereBtn').onclick = ()=> arriveAt(c.latitude, c.longitude, null, { acc: c.accuracy, src:'gps' });
+  }, ()=>{}, { enableHighAccuracy:true, timeout:20000, maximumAge:60000 });
 }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && dataLoaded) onAppOpen(); });
 
