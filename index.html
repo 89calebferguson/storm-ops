@@ -506,6 +506,7 @@
     <button class="tab" data-tab="jobs"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/><path d="M8.5 17h7"/></svg><span>Jobs</span></button>
     <button class="tab" data-tab="map"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
     <button class="tab" data-tab="affected"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L5 13h6l-1 9 8-11h-6z"/></svg><span>Affected</span></button>
+    <button class="tab" data-tab="debris"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h13l2-5h3v5h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M4 13l3-6h6l2 6"/></svg><span>Debris</span></button>
     <button class="tab" data-tab="safety"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16h.01"/></svg><span>Safety</span></button>
     <button class="tab" data-tab="needs"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A5 5 0 0 1 21 19"/></svg><span>Crew</span></button>
     <button class="tab" data-tab="notes"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5"/><path d="M8 13h8M8 17h6"/></svg><span>Notes</span></button>
@@ -921,6 +922,7 @@
     <div class="aff-toggles">
       <label class="aff-tg on"><input type="checkbox" id="affShowOut" checked> ⚡ Outage / damage</label>
       <label class="aff-tg on"><input type="checkbox" id="affShowGust" checked> 💨 High gusts</label>
+      <label class="aff-tg on"><input type="checkbox" id="affShowRoads" checked> 🚧 Road closures</label>
       <label class="aff-tg on"><input type="checkbox" id="affShowZones" checked> 🗺️ Our zones &amp; pins</label>
     </div>
     <div class="status-line" id="affStatus">Load an area on the Here tab, then tap Refresh.</div>
@@ -929,6 +931,8 @@
       <div><span class="sw" style="background:#ffd23f"></span>Some reports <span class="sw" style="background:#ff8c1a"></span>Many <span class="sw" style="background:#e5242b"></span>Hardest hit</div>
       <div><span class="dot" style="background:#9aa1a8"></span>Gust under 40 <span class="dot" style="background:#ff8c1a"></span>40 to 57 mph <span class="dot" style="background:#e5242b"></span>58+ mph (severe)</div>
     </div>
+    <p class="section-label" style="margin-top:14px;">Road Closures</p>
+    <div id="roadList"></div>
     <p class="section-label" style="margin-top:14px;">Hardest Hit Spots</p>
     <div id="affList"></div>
     <details class="aff-about">
@@ -936,6 +940,27 @@
       <p>Orange and red squares come from damage reports sent to the National Weather Service in that time window: downed power lines and poles count most, then tornadoes and survey damage points, then trees and wind damage. Your own Outage and Hardest Hit zones are drawn on top.</p>
       <p>Gust dots are measured gusts: NWS storm reports plus today's peak gust at each weather station near you.</p>
       <p>There is no free live feed of utility outage counts, so this shows where outages are most likely, not the exact count. For exact numbers, use the utility outage map link below the list.</p>
+    </details>
+  </div>
+
+  <div class="view" id="view-debris">
+    <p class="section-label">Debris Disposal</p>
+    <p class="hint">Places to take brush, logs and chips near the working area: landfills, transfer stations, compost and mulch yards, sawmills and firewood buyers, plus big open land worth asking about.</p>
+    <div class="btn-row" style="margin-bottom:8px;">
+      <select id="debRadius" class="small-btn" aria-label="Distance"><option value="15">15 mi</option><option value="30" selected>30 mi</option><option value="60">60 mi</option></select>
+      <button class="small-btn go" id="debLoadBtn" type="button">Search</button>
+    </div>
+    <div class="status-line" id="debStatus">Load an area on the Here tab, then tap Search.</div>
+    <div id="debProgram"></div>
+    <div class="live-cats" id="debCats"></div>
+    <div id="debResults"></div>
+    <p class="section-label" style="margin-top:18px;">Large Open Land Nearby</p>
+    <p class="hint">Farm fields, meadows and empty lots of 5+ acres within about 5 miles. Tap 🏠 to see who owns it, then call and ask about dumping or a temporary staging spot.</p>
+    <div id="debLand"></div>
+    <details class="aff-about">
+      <summary>Before you dump anywhere</summary>
+      <p>You need the owner's permission to put debris on private land, and get it in writing. Many states also require a permit or notice for a temporary debris site, and burning usually needs a burn permit from the fire department or county. Ask the county EMA or town public works first, since they often run an official debris site during storm recovery.</p>
+      <p>Listings come from the free open map, so hours, fees and what each place accepts are not included. Call ahead.</p>
     </details>
   </div>
 
@@ -1231,6 +1256,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'here' && miniMaps.hereMiniMap) setTimeout(()=>miniMaps.hereMiniMap.invalidateSize(), 50);
     if(btn.dataset.tab === 'affected') openAffected();
+    if(btn.dataset.tab === 'debris') openDebris();
     if(btn.dataset.tab === 'sales') openSalesMap();
     if(btn.dataset.tab === 'map'){ initMap(); setTimeout(()=>{ if(leafletMap) leafletMap.invalidateSize(); }, 50); startMyDot(); }
   });
@@ -3776,6 +3802,177 @@ function renderTerritories(){
   }).join('')).join('') + '<button class="small-btn" style="display:block; width:100%; margin-top:8px;" onclick="shareTerritories()">📤 Send territories to the crew</button>';
 }
 
+
+// ========== DEBRIS DISPOSAL ==========
+// Open-map search for places that take storm debris, and big open parcels
+// (farmland, meadow, vacant lots) whose owners might allow staging or dumping.
+const DEBRIS_CATS = [
+  { key:'landfill', label:'Landfills',        icon:'🏔️', test: t=> t.landuse === 'landfill' || /landfill/i.test(t.name || '') },
+  { key:'transfer', label:'Transfer Stations',icon:'🚛', test: t=> t.amenity === 'waste_transfer_station' || /transfer station/i.test(t.name || '') },
+  { key:'compost',  label:'Compost / Mulch / Yard Waste', icon:'🌿', test: t=> t['recycling:green_waste'] === 'yes' || t['recycling:organic'] === 'yes' || t['recycling:wood'] === 'yes' || t.industrial === 'compost' || /mulch|compost|yard waste|landscape supply|wood recycl|tree recycl|brush/i.test(t.name || '') },
+  { key:'sawmill',  label:'Sawmills / Log Buyers', icon:'🪚', test: t=> t.craft === 'sawmill' || t.industrial === 'sawmill' || /sawmill|saw mill|lumber|log buyer|timber/i.test(t.name || '') },
+  { key:'firewood', label:'Firewood',         icon:'🔥', test: t=> t.shop === 'firewood' || /firewood/i.test(t.name || '') },
+  { key:'recycle',  label:'Recycling Centers',icon:'♻️', test: t=> t.amenity === 'recycling' && t.recycling_type === 'centre' }
+];
+let debrisData = null, debrisFilter = 'all';
+async function openDebris(){
+  const a = currentArea();
+  if(!a){ setStatus('debStatus', 'Load an area on the Here tab first.', 'warn'); return; }
+  renderDebrisProgram(a);
+  if(!debrisData || debrisData.areaId !== a.id) debrisData = await getJSON('debris:' + a.id, null);
+  if(debrisData && Date.now() - debrisData.time < 24*3600000) renderDebris();
+  else loadDebris();
+}
+async function loadDebris(){
+  const a = currentArea(); if(!a) return;
+  if(!navigator.onLine){ setStatus('debStatus', debrisData ? `No signal. Showing the list saved ${timeAgo(debrisData.time)}.` : 'No signal and nothing saved yet for this area.', 'warn'); if(debrisData) renderDebris(); return; }
+  const R = (+document.getElementById('debRadius').value) * 1609, R2 = 8000, la = a.lat, lo = a.lng;
+  const nameRe = 'mulch|compost|yard waste|landscape supply|wood recycl|tree recycl|sawmill|saw mill|log buyer|firewood|landfill|transfer station';
+  const q1 = `[out:json][timeout:30];(nwr["landuse"="landfill"](around:${R},${la},${lo});nwr["amenity"="waste_transfer_station"](around:${R},${la},${lo});nwr["amenity"="recycling"]["recycling_type"="centre"](around:${R},${la},${lo});nwr["recycling:green_waste"="yes"](around:${R},${la},${lo});nwr["recycling:wood"="yes"](around:${R},${la},${lo});nwr["industrial"~"^(compost|sawmill)$"](around:${R},${la},${lo});nwr["craft"="sawmill"](around:${R},${la},${lo});nwr["shop"="firewood"](around:${R},${la},${lo});nwr["name"~"${nameRe}",i](around:${R},${la},${lo}););out center tags 400;`;
+  const q2 = `[out:json][timeout:30];way["landuse"~"^(farmland|meadow|brownfield|greenfield|grass)$"](around:${R2},${la},${lo});out bb tags 600;`;
+  setStatus('debStatus', 'Searching the open map for disposal sites…');
+  const out = { time: Date.now(), areaId: a.id, sites: [], land: [], failed: [] };
+  try{
+    const d = await overpass(q1, 35000), seen = new Set();
+    (d.elements || []).forEach(el=>{
+      const t = el.tags || {}, y = el.lat || (el.center && el.center.lat), x = el.lon || (el.center && el.center.lon);
+      if(!y || t.highway || t.place || t.leisure) return;
+      const cat = DEBRIS_CATS.find(c=>c.test(t)); if(!cat) return;
+      const name = t.name || t.operator || cat.label.replace(/s$/, '');
+      const k = name + y.toFixed(3); if(seen.has(k)) return; seen.add(k);
+      out.sites.push({ cat: cat.key, name, lat:y, lng:x, dist: distMiles(la, lo, y, x), phone: t.phone || t['contact:phone'] || '', web: t.website || t['contact:website'] || '',
+        address: [t['addr:housenumber'], t['addr:street'], t['addr:city']].filter(Boolean).join(' '), hours: t.opening_hours || '', operator: t.operator || '' });
+    });
+    out.sites.sort((p, q)=>p.dist - q.dist);
+  }catch(e){ out.failed.push('disposal sites'); }
+  setStatus('debStatus', 'Looking for large open land…');
+  try{
+    const d = await overpass(q2, 35000);
+    (d.elements || []).forEach(el=>{
+      const b = el.bounds; if(!b) return;
+      const h = (b.maxlat - b.minlat) * 69, w = (b.maxlon - b.minlon) * 69 * Math.cos(la * Math.PI/180);
+      const acres = Math.round(h * w * 640 * .7); // bounding box, trimmed for odd shapes
+      if(acres < 5) return;
+      const y = (b.minlat + b.maxlat) / 2, x = (b.minlon + b.maxlon) / 2, t = el.tags || {};
+      out.land.push({ kind: t.landuse, name: t.name || '', acres, lat:y, lng:x, dist: distMiles(la, lo, y, x) });
+    });
+    out.land.sort((p, q)=>p.dist - q.dist); out.land = out.land.slice(0, 15);
+  }catch(e){ out.failed.push('open land'); }
+  if(!out.sites.length && !out.land.length && out.failed.length && debrisData){ setStatus('debStatus', 'The map servers are busy. Showing the saved list.', 'warn'); renderDebris(); return; }
+  debrisData = out; await setJSON('debris:' + a.id, out);
+  renderDebris();
+}
+function renderDebrisProgram(a){
+  const town = bareTown(a.town), co = a.county ? a.county + ' County' : 'county', st = a.stateCode || a.state || '';
+  const pack = a.townPack, pw = pack && pack.contacts ? pack.contacts.find(c=>c.group === 'roads') : null;
+  const ema = (a.offices || []).find(o=>o.group === 'ema');
+  document.getElementById('debProgram').innerHTML = `<div class="call-group town-group" style="margin-bottom:12px;"><h3>Official Storm Debris Program</h3>
+    ${pw ? phoneRow(`${town} ${pw.name}`, pw.notes || 'Runs storm debris pickup and drop-off for the town', pw.phone, '🚧', pw.web || pw.source) : searchRow(`${town} storm debris drop-off`, 'Towns often open a temporary brush and log site after a storm', `${town} ${st} storm debris drop off site`, '🚧')}
+    ${ema ? phoneRow(ema.name, 'County emergency management often runs the official debris sites', ema.phone, '🆘', ema.web) : searchRow(`${co} Emergency Management`, 'Ask about official temporary debris sites and contractor rules', `${co} ${st} emergency management storm debris site`, '🆘')}
+    ${searchRow(`${co} burn permit / open burning`, 'Who to call before burning brush', `${co} ${st} open burning permit brush`, '🔥')}</div>`;
+}
+function renderDebris(){
+  const D = debrisData; if(!D) return;
+  const counts = {}; D.sites.forEach(x=> counts[x.cat] = (counts[x.cat] || 0) + 1);
+  const cats = document.getElementById('debCats');
+  cats.innerHTML = `<button class="live-cat${debrisFilter === 'all' ? ' active' : ''}" data-k="all"><span class="lc-icon">📋</span>All (${D.sites.length})</button>` +
+    DEBRIS_CATS.filter(c=>counts[c.key]).map(c=>`<button class="live-cat${debrisFilter === c.key ? ' active' : ''}" data-k="${c.key}"><span class="lc-icon">${c.icon}</span>${c.label} (${counts[c.key]})</button>`).join('');
+  cats.querySelectorAll('.live-cat').forEach(b=> b.onclick = ()=>{ debrisFilter = b.dataset.k; renderDebris(); });
+  // closest 4 of each kind, so every option type shows up
+  const shown = debrisFilter === 'all' ? DEBRIS_CATS.flatMap(c=> D.sites.filter(x=>x.cat === c.key).slice(0, 4)) : D.sites.filter(x=>x.cat === debrisFilter);
+  const dir = (y, x)=> `https://www.google.com/maps/dir/?api=1&destination=${y},${x}`;
+  document.getElementById('debResults').innerHTML = shown.length ? shown.map(x=>{
+    const c = DEBRIS_CATS.find(k=>k.key === x.cat);
+    return `<div class="card"><div class="dist-badge">${x.dist.toFixed(0)}<small>MI</small></div>
+      <div class="card-body"><div class="card-name">${c.icon} ${escapeHtml(x.name)}</div>
+        <div class="card-sub wrap">${escapeHtml(c.label)}${x.address ? ' · ' + escapeHtml(x.address) : ''}${x.hours ? ' · ' + escapeHtml(x.hours) : ''}</div>
+        ${x.phone ? `<div class="card-phone">${escapeHtml(x.phone)}</div>` : '<div class="card-sub">No phone in map data</div>'}</div>
+      <div class="card-actions">
+        <a class="icon-btn" href="${dir(x.lat, x.lng)}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
+        ${x.phone ? `<a class="icon-btn call" href="tel:${x.phone.replace(/[^0-9+]/g, '')}" aria-label="Call">📞</a>` : `<button class="icon-btn" onclick="debOwner(${x.lat}, ${x.lng})" aria-label="Who owns this">🏠</button>`}
+      </div></div>`;
+  }).join('') : `<div class="cat-empty">No disposal sites found in the open map within ${document.getElementById('debRadius').value} miles. Try a wider distance, or <a href="https://www.google.com/search?q=${encodeURIComponent('landfill OR mulch OR compost yard near ' + (currentArea().town || '') + ' ' + (currentArea().state || ''))}" target="_blank" rel="noopener">search the web</a>.</div>`;
+  const kindName = { farmland:'Farm field', meadow:'Meadow / pasture', brownfield:'Vacant lot (brownfield)', greenfield:'Vacant land', grass:'Open grass lot' };
+  document.getElementById('debLand').innerHTML = D.land.length ? D.land.map(x=>`<div class="card"><div class="dist-badge">${x.dist.toFixed(1)}<small>MI</small></div>
+      <div class="card-body"><div class="card-name">${escapeHtml(kindName[x.kind] || 'Open land')}${x.name ? ' · ' + escapeHtml(x.name) : ''}</div><div class="card-sub">About ${x.acres.toLocaleString()} acres</div></div>
+      <div class="card-actions"><button class="icon-btn" onclick="debOwner(${x.lat}, ${x.lng})" aria-label="Who owns this">🏠</button><a class="icon-btn" href="${dir(x.lat, x.lng)}" target="_blank" rel="noopener" aria-label="Directions">📍</a></div></div>`).join('')
+    : '<div class="cat-empty">No large open land found in the map data near here.</div>';
+  setStatus('debStatus', `${D.sites.length} disposal site${D.sites.length === 1 ? '' : 's'} and ${D.land.length} open-land spot${D.land.length === 1 ? '' : 's'} found. Updated ${timeAgo(D.time)}.${D.failed.length ? ' Couldn\'t load: ' + D.failed.join(', ') + '.' : ''}`, D.failed.length ? 'warn' : 'ok');
+}
+function debOwner(lat, lng){ document.querySelector('.tab[data-tab="owner"]').click(); runOwnerLookup(lat, lng); }
+document.getElementById('debLoadBtn').addEventListener('click', loadDebris);
+document.getElementById('debRadius').addEventListener('change', loadDebris);
+
+
+// ---------- road closures ----------
+// Free sources: state DOT feeds that need no key and allow browser access
+// (ROAD_FEEDS), NWS alerts that mention closed roads, and the crew's own
+// "Road closed" pins. Everywhere else, a link to the state's 511 site.
+const STATE_511 = {};
+const ROAD_FEEDS = []; // { state, url, kind:'wzdx'|'arcgis', label }
+async function loadRoadClosures(c, radiusMi){
+  const a = currentArea(), st = (a && a.stateCode) || '';
+  const items = [], failed = [];
+  const near = (y, x)=> distMiles(c.lat, c.lng, y, x) <= radiusMi;
+  for(const f of ROAD_FEEDS.filter(f=> f.state === st || stormStates().split(',').slice(0, 3).includes(f.state))){
+    try{
+      if(f.kind === 'wzdx'){
+        const d = await fetchJSON(f.url, {}, 20000);
+        (d.features || []).forEach(ft=>{
+          const p = ft.properties || {}, core = p.core_details || p;
+          const pt = firstPoint(ft.geometry); if(!pt || !near(pt[1], pt[0])) return;
+          const closed = /all-lanes-closed|closed/i.test(p.vehicle_impact || '') || /closure|closed/i.test(core.description || '');
+          items.push({ src: f.label, lat: pt[1], lng: pt[0], geom: ft.geometry, closed, road: (core.road_names || []).join(', '), text: core.description || core.event_type || 'Work zone', start: p.start_date || '', end: p.end_date || '' });
+        });
+      }else if(f.kind === 'arcgis'){
+        const env = `${c.lng - 1},${c.lat - .8},${c.lng + 1},${c.lat + .8}`;
+        const d = await fetchJSON(`${f.url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&resultRecordCount=500&f=geojson`, {}, 20000);
+        (d.features || []).forEach(ft=>{
+          const p = ft.properties || {}, pt = firstPoint(ft.geometry); if(!pt || !near(pt[1], pt[0])) return;
+          const text = f.text ? f.text(p) : Object.values(p).filter(v=>typeof v === 'string' && v.length > 15).slice(0, 2).join(' · ');
+          items.push({ src: f.label, lat: pt[1], lng: pt[0], geom: ft.geometry, closed: f.closed ? f.closed(p) : /clos/i.test(text), road: f.road ? f.road(p) : '', text, start:'', end:'' });
+        });
+      }
+    }catch(e){ failed.push(f.label); }
+  }
+  // NWS alerts that talk about closed roads
+  const wx = a && a.weather;
+  (wx && wx.alerts || []).forEach(al=>{
+    const txt = [al.headline, al.description, al.instruction].join(' ');
+    const m = txt.match(/[^.]*\b(road|roads|highway|street|streets)\b[^.]*\b(closed|closures?|impassable|blocked|washed out)\b[^.]*\./i);
+    if(m) items.push({ src:'NWS alert', lat: c.lat, lng: c.lng, closed:true, road:'', text: (al.event || 'Alert') + ': ' + m[0].trim(), area:true });
+  });
+  // crew pins
+  marks.filter(m=> m.type === 'road' && m.lat != null && near(m.lat, m.lng)).forEach(m=> items.push({ src:'Your crew', lat:m.lat, lng:m.lng, closed:true, road: m.address || '', text: m.note || 'Road closed', time: m.time }));
+  items.forEach(x=> x.dist = distMiles(c.lat, c.lng, x.lat, x.lng));
+  items.sort((p, q)=> (q.closed - p.closed) || (p.dist - q.dist));
+  return { items, failed, state: st, feeds: ROAD_FEEDS.filter(f=>f.state === st).length };
+}
+function firstPoint(g){
+  if(!g) return null;
+  if(g.type === 'Point') return g.coordinates;
+  if(g.type === 'LineString' || g.type === 'MultiPoint') return g.coordinates[Math.floor(g.coordinates.length / 2)];
+  if(g.type === 'MultiLineString' || g.type === 'Polygon') return g.coordinates[0][Math.floor(g.coordinates[0].length / 2)];
+  return null;
+}
+function drawRoads(D){
+  const R = D.roads || { items:[] }, a = currentArea(), st = (a && a.stateCode) || R.state || '';
+  R.items.filter(x=>!x.area).forEach(x=>{
+    const col = x.closed ? '#e5242b' : '#ffb000';
+    if(x.geom && /Line/.test(x.geom.type)) L.geoJSON(x.geom, { style:{ color: col, weight:6, opacity:.85 } }).addTo(affLayers.roads);
+    L.marker([x.lat, x.lng], { icon: L.divIcon({ className:'aff-pin', html: x.closed ? '⛔' : '🚧', iconSize:[24,24] }) })
+      .bindPopup(`<div class="popup-title">${x.closed ? 'Road closed' : 'Work zone / restriction'}</div>${x.road ? '<b>' + escapeHtml(x.road) + '</b><br>' : ''}${escapeHtml(x.text || '')}<br><small>${escapeHtml(x.src)}</small>`).addTo(affLayers.roads);
+  });
+  const s511 = STATE_511[st];
+  document.getElementById('roadList').innerHTML = (R.items.length ? R.items.slice(0, 12).map(x=>`<div class="card">
+      <div class="dist-badge">${x.area ? '—' : x.dist.toFixed(0)}<small>${x.area ? 'AREA' : 'MI'}</small></div>
+      <div class="card-body"><div class="card-name">${x.closed ? '⛔' : '🚧'} ${escapeHtml(x.road || (x.closed ? 'Road closed' : 'Work zone'))}</div>
+        <div class="card-sub wrap">${escapeHtml(x.text || '')}</div><div class="fresh">${escapeHtml(x.src)}${x.time ? ' · ' + timeAgo(x.time) : ''}</div></div>
+      ${x.area ? '' : `<div class="card-actions"><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lng}" target="_blank" rel="noopener" aria-label="Map">📍</a></div>`}</div>`).join('')
+    : `<div class="cat-empty">No closures reported near here${R.feeds ? '' : ' from the sources this app can read for ' + (st || 'this state')}. Mark one with 🚧 Road Closed Here on the Owner tab.</div>`)
+    + `<a class="small-btn" style="display:block; margin-top:8px;" href="${s511 || 'https://www.fhwa.dot.gov/trafficinfo/'}" target="_blank" rel="noopener">🛣️ ${s511 ? (st + ' 511 road conditions map') : 'State road conditions (511) sites'}</a>`;
+}
+
 // ========== AFFECTED AREAS ==========
 // A heat grid of storm damage around the working area. No free feed of live
 // utility outage counts exists, so outages are estimated from what's reported
@@ -3799,7 +3996,8 @@ function openAffected(){
     affLayers.gust = L.layerGroup().addTo(affMap);
     affLayers.zones = L.layerGroup().addTo(affMap);
     affLayers.me = L.layerGroup().addTo(affMap);
-    [['affShowOut','out'],['affShowGust','gust'],['affShowZones','zones']].forEach(([id,k])=>{
+    affLayers.roads = L.layerGroup().addTo(affMap);
+    [['affShowOut','out'],['affShowGust','gust'],['affShowZones','zones'],['affShowRoads','roads']].forEach(([id,k])=>{
       const cb = document.getElementById(id);
       cb.addEventListener('change', ()=>{ cb.checked ? affMap.addLayer(affLayers[k]) : affMap.removeLayer(affLayers[k]); cb.parentElement.classList.toggle('on', cb.checked); });
     });
@@ -3849,6 +4047,8 @@ async function loadAffected(){
   if(!out.stations.length) out.failed.push('station gusts');
   const sl = await getJSON('stormLayers', null);
   if(sl && sl.dat) out.dat = sl.dat.map(f=>({ lat:(f.geometry||{}).y, lng:(f.geometry||{}).x })).filter(p=> p.lat != null && inRange(p.lat, p.lng));
+  setStatus('affStatus', 'Checking road closures…');
+  out.roads = await loadRoadClosures(c, radius).catch(()=>({ items:[], failed:['road closures'] }));
   affData = out;
   await setJSON(key, out);
   drawAffected();
@@ -3916,6 +4116,7 @@ function drawAffected(){
       .bindTooltip(`${z.kind === 'outage' ? '⚡' : '🌪️'} ${escapeHtml(z.name)}`, { direction:'center' }).addTo(affLayers.zones);
   });
   L.circleMarker([c.lat, c.lng], { radius:7, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).bindPopup(escapeHtml(c.name)).addTo(affLayers.me);
+  drawRoads(D);
   L.circle([c.lat, c.lng], { radius: D.radius * 1609, color:'#2f80ed', weight:1, dashArray:'4 6', fill:false, interactive:false }).addTo(affLayers.me);
 
   // rank: cells with their own reports, by heat
