@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Storm Ops</title>
-<meta name="theme-color" content="#16191c">
+<meta name="theme-color" content="#0d1520">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,20 +16,65 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
+  /* Storm Ops field theme. Layout: one column, big tap targets, sticky
+     header + icon tabs. Dark storm-slate by default; a high-contrast light
+     mode for direct sunlight follows the phone setting or the ☀ toggle. */
   :root{
-    --bg: #16191c;
-    --panel: #1e2226;
-    --panel-raised: #262b30;
-    --line: #33393f;
-    --text: #f0ede4;
-    --text-dim: #9aa1a8;
-    --accent: #e8590c;
-    --accent-dim: #7a3308;
-    --ok: #4c9a63;
-    --blue: #3e7cb1;
+    color-scheme: dark;
+    --bg: #0d1520;
+    --bg-2: #13233a;
+    --panel: #15212f;
+    --panel-raised: #1c2b3d;
+    --line: #2a3d54;
+    --text: #eef3f8;
+    --text-dim: #a3b4c8;
+    --accent: #ff7a1a;
+    --accent-press: #e0620a;
+    --accent-ink: #1a0d02;
+    --accent-dim: #8a3d0c;
+    --accent-glow: rgba(255,122,26,.18);
+    --amber: #ffb627;
+    --ok: #36c27b;
+    --ok-bg: #133524;
+    --ok-text: #7ff0b0;
+    --blue: #3d8bfd;
+    --blue-bg: #13294a;
+    --blue-text: #9cc6ff;
+    --danger: #ff6464;
+    --danger-bg: #3d1618;
+    --danger-line: #8f2f33;
+    --warn-bg: #3d2a12;
+    --warn-text: #ffc77a;
+    --gold-bg: #39330f;
+    --gold-text: #f2e27a;
+    --shadow: 0 2px 10px rgba(0,0,0,.35);
     --font-display: 'Oswald', 'Arial Narrow', sans-serif;
     --font-body: 'IBM Plex Sans', system-ui, sans-serif;
-    --font-mono: 'IBM Plex Mono', monospace;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      color-scheme: light;
+      --bg: #eef2f6; --bg-2: #dfe7f0; --panel: #ffffff; --panel-raised: #fff7f0; --line: #b9c6d4;
+      --text: #0b1520; --text-dim: #3f5163;
+      --accent: #d95700; --accent-press: #b84900; --accent-ink: #ffffff; --accent-dim: #f0b48a; --accent-glow: rgba(217,87,0,.12);
+      --amber: #a86a00; --ok: #137a45; --ok-bg: #d8f3e4; --ok-text: #0b5a32;
+      --blue: #1f63d1; --blue-bg: #dce9ff; --blue-text: #143f8a;
+      --danger: #c2181f; --danger-bg: #fde2e2; --danger-line: #e59a9d;
+      --warn-bg: #fff0d6; --warn-text: #8a4d00; --gold-bg: #fbf3c4; --gold-text: #6b5600;
+      --shadow: 0 1px 4px rgba(15,30,50,.12);
+    }
+  }
+  :root[data-theme="light"]{
+    color-scheme: light;
+    --bg: #eef2f6; --bg-2: #dfe7f0; --panel: #ffffff; --panel-raised: #fff7f0; --line: #b9c6d4;
+    --text: #0b1520; --text-dim: #3f5163;
+    --accent: #d95700; --accent-press: #b84900; --accent-ink: #ffffff; --accent-dim: #f0b48a; --accent-glow: rgba(217,87,0,.12);
+    --amber: #a86a00; --ok: #137a45; --ok-bg: #d8f3e4; --ok-text: #0b5a32;
+    --blue: #1f63d1; --blue-bg: #dce9ff; --blue-text: #143f8a;
+    --danger: #c2181f; --danger-bg: #fde2e2; --danger-line: #e59a9d;
+    --warn-bg: #fff0d6; --warn-text: #8a4d00; --gold-bg: #fbf3c4; --gold-text: #6b5600;
+    --shadow: 0 1px 4px rgba(15,30,50,.12);
   }
 
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
@@ -56,11 +101,11 @@
 
   /* shared components */
   .locate-btn{
-    width:100%; background:var(--accent); color:#1a1a1a; border:none;
+    width:100%; background:var(--accent); color:var(--accent-ink); border:none;
     font-family:var(--font-display); font-weight:700; font-size:16px; letter-spacing:.03em;
     text-transform:uppercase; padding:14px; border-radius:4px; margin-bottom:6px;
   }
-  .locate-btn:active{ background:#c84a09; }
+  .locate-btn:active{ background:var(--accent-press); }
   .locate-btn.secondary{ background:var(--blue); }
   .status-line{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-bottom:14px; min-height:16px; }
   .status-line.ok{ color:var(--ok); }
@@ -99,7 +144,7 @@
     border:1px solid var(--line); background:var(--bg); color:var(--text); text-decoration:none; font-size:16px;
   }
   .icon-btn.call{ border-color:var(--ok); color:var(--ok); }
-  .icon-btn.del{ border-color:#8a3a3a; color:#c96b6b; background:none; }
+  .icon-btn.del{ border-color:var(--danger-line); color:var(--danger); background:none; }
 
   .manage-panel{ display:none; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:14px; margin-bottom:22px; }
   .manage-panel.open{ display:block; }
@@ -112,7 +157,7 @@
   }
   .field textarea{ resize:vertical; min-height:50px; }
   .add-btn{
-    width:100%; background:var(--ok); color:#111; border:none; font-family:var(--font-display);
+    width:100%; background:var(--ok); color:var(--accent-ink); border:none; font-family:var(--font-display);
     font-weight:600; text-transform:uppercase; letter-spacing:.03em; padding:12px; border-radius:4px; font-size:14px; margin-top:4px;
   }
   .geocode-status{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-top:6px; min-height:14px; }
@@ -132,15 +177,15 @@
     font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.04em;
     padding:2px 7px; border-radius:10px; flex-shrink:0;
   }
-  .status-New{ background:#2c3a4d; color:#7fb2e8; }
-  .status-Contacted{ background:#4d3a2c; color:#e8b57f; }
-  .status-Bid-Sent{ background:#4d472c; color:#e0e87f; }
-  .status-Won{ background:#2c4d33; color:#7fe89b; }
-  .status-Lost{ background:#4d2c2c; color:#e87f7f; }
+  .status-New{ background:var(--blue-bg); color:var(--blue-text); }
+  .status-Contacted{ background:var(--warn-bg); color:var(--warn-text); }
+  .status-Bid-Sent{ background:var(--gold-bg); color:var(--gold-text); }
+  .status-Won{ background:var(--ok-bg); color:var(--ok-text); }
+  .status-Lost{ background:var(--danger-bg); color:var(--danger); }
 
   /* crew needs */
-  .prio-High{ color:#e87f7f; }
-  .prio-Medium{ color:#e8b57f; }
+  .prio-High{ color:var(--danger); }
+  .prio-Medium{ color:var(--warn-text); }
   .prio-Low{ color:var(--text-dim); }
   .need-check{ width:22px; height:22px; flex-shrink:0; accent-color: var(--ok); }
   .need-fulfilled .card-name, .need-fulfilled .card-sub{ text-decoration:line-through; opacity:.5; }
@@ -148,7 +193,7 @@
   /* photo gallery */
   .icon-btn.photo{ position:relative; }
   .icon-btn.photo .pcount{
-    position:absolute; top:-6px; right:-6px; background:var(--accent); color:#1a1a1a;
+    position:absolute; top:-6px; right:-6px; background:var(--accent); color:var(--accent-ink);
     font-family:var(--font-mono); font-size:9px; font-weight:700; border-radius:8px;
     min-width:15px; height:15px; display:flex; align-items:center; justify-content:center; padding:0 3px;
   }
@@ -162,7 +207,7 @@
   .gallery-close{ background:none; border:1px solid var(--line); color:var(--text); width:36px; height:36px; border-radius:4px; font-size:18px; }
   .gallery-actions{ display:flex; gap:8px; margin-bottom:16px; }
   .gallery-actions button{
-    flex:1; background:var(--accent); color:#1a1a1a; border:none; font-family:var(--font-display);
+    flex:1; background:var(--accent); color:var(--accent-ink); border:none; font-family:var(--font-display);
     font-weight:600; text-transform:uppercase; letter-spacing:.02em; padding:12px; border-radius:4px; font-size:13px;
   }
   .gallery-actions button.secondary{ background:var(--blue); color:#fff; }
@@ -170,7 +215,7 @@
   .gallery-item{ position:relative; border-radius:5px; overflow:hidden; border:1px solid var(--line); background:var(--panel); aspect-ratio:1; }
   .gallery-item img{ width:100%; height:100%; object-fit:cover; display:block; }
   .gallery-item .gdel{
-    position:absolute; top:4px; right:4px; background:rgba(10,11,12,.8); color:#c96b6b; border:none;
+    position:absolute; top:4px; right:4px; background:rgba(10,11,12,.8); color:var(--danger); border:none;
     width:26px; height:26px; border-radius:4px; font-size:15px;
   }
   .gallery-empty{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); text-align:center; padding:30px 0; }
@@ -206,15 +251,15 @@
   .note-text{ font-size:14px; white-space:pre-wrap; margin-bottom:4px; }
   .note-meta{ font-family:var(--font-mono); font-size:10px; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center; }
   .alert-flash{
-    display:none; position:fixed; inset:0; z-index:200; background:var(--accent); color:#1a1a1a;
+    display:none; position:fixed; inset:0; z-index:200; background:var(--accent); color:var(--accent-ink);
     align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:30px;
     animation: flashbg 1s infinite;
   }
   .alert-flash.show{ display:flex; }
-  @keyframes flashbg{ 0%,100%{ background:var(--accent);} 50%{ background:#ffb066; } }
+  @keyframes flashbg{ 0%,100%{ background:var(--accent);} 50%{ background:var(--amber); } }
   .alert-flash h2{ font-family:var(--font-display); font-size:28px; text-transform:uppercase; margin:0 0 10px; }
   .alert-flash p{ font-size:16px; margin:0 0 20px; }
-  .alert-flash button{ background:#1a1a1a; color:#fff; border:none; padding:14px 28px; border-radius:4px; font-family:var(--font-display); font-weight:700; text-transform:uppercase; font-size:14px; }
+  .alert-flash button{ background:#10161e; color:#fff; border:none; padding:14px 28px; border-radius:4px; font-family:var(--font-display); font-weight:700; text-transform:uppercase; font-size:14px; }
 
   /* in-app browser */
   .webview-overlay{ display:none; position:fixed; inset:0; z-index:150; background:var(--bg); flex-direction:column; }
@@ -226,7 +271,7 @@
   .webview-fallback{ flex:1; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px; gap:14px; }
   .webview-fallback.show{ display:flex; }
   .webview-fallback p{ font-family:var(--font-mono); font-size:12.5px; color:var(--text-dim); max-width:280px; line-height:1.6; }
-  .webview-fallback a{ background:var(--accent); color:#1a1a1a; text-decoration:none; padding:12px 24px; border-radius:4px; font-family:var(--font-display); font-weight:700; text-transform:uppercase; font-size:13px; }
+  .webview-fallback a{ background:var(--accent); color:var(--accent-ink); text-decoration:none; padding:12px 24px; border-radius:4px; font-family:var(--font-display); font-weight:700; text-transform:uppercase; font-size:13px; }
 
   /* live nearby search */
   .live-cats{ display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:10px; }
@@ -255,8 +300,8 @@
 
   /* diagnostics */
   .diag{
-    background:#2a1a1a; border:1px solid #8a3a3a; border-radius:5px; padding:10px 12px;
-    margin-bottom:12px; font-family:var(--font-mono); font-size:11px; color:#e8a0a0;
+    background:var(--danger-bg); border:1px solid var(--danger-line); border-radius:5px; padding:10px 12px;
+    margin-bottom:12px; font-family:var(--font-mono); font-size:11px; color:var(--danger);
     display:none; white-space:pre-wrap; word-break:break-word;
   }
   .diag.show{ display:block; }
@@ -268,9 +313,9 @@
   .hint{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px; line-height:1.5; }
   .net-pill{ font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:10px; margin:0 0 12px; display:inline-flex; align-items:center; gap:5px; }
   .net-pill::before{ content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
-  .net-pill.on{ background:#1f3326; color:#7fe89b; }
-  .net-pill.off{ background:#4d2c2c; color:#f0a0a0; }
-  .net-banner{ background:#3a2a1c; border:1px solid var(--accent-dim); color:#f2c9a4; border-radius:5px; padding:10px 12px; font-size:13px; margin-bottom:12px; line-height:1.45; }
+  .net-pill.on{ background:var(--ok-bg); color:var(--ok-text); }
+  .net-pill.off{ background:var(--danger-bg); color:var(--danger); }
+  .net-banner{ background:var(--warn-bg); border:1px solid var(--accent-dim); color:var(--warn-text); border-radius:5px; padding:10px 12px; font-size:13px; margin-bottom:12px; line-height:1.45; }
   .area-card{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:6px; padding:14px; margin-bottom:12px; }
   .area-name{ font-family:var(--font-display); font-size:22px; font-weight:700; text-transform:uppercase; letter-spacing:.01em; line-height:1.1; text-wrap:balance; }
   .area-sub{ font-size:13px; color:var(--text-dim); margin-top:6px; line-height:1.45; }
@@ -283,11 +328,11 @@
   .call-group h3{ font-family:var(--font-mono); font-size:10.5px; color:var(--accent); text-transform:uppercase; letter-spacing:.08em; margin:0 0 6px; font-weight:600; }
   .card-sub.wrap{ white-space:normal; }
   .card-phone{ font-family:var(--font-mono); font-size:13px; color:var(--text); user-select:all; }
-  .icon-btn.star{ border-color:#7a6a2a; color:#e0c84a; background:none; }
-  .icon-btn.star.saved{ background:#3a3418; }
-  .icon-btn.web{ border-color:var(--blue); color:#8fb8dc; }
+  .icon-btn.star{ border-color:var(--gold-text); color:var(--gold-text); background:none; }
+  .icon-btn.star.saved{ background:var(--gold-bg); }
+  .icon-btn.web{ border-color:var(--blue); color:var(--blue-text); }
   .fresh{ font-family:var(--font-mono); font-size:10px; color:var(--text-dim); }
-  .fresh.stale{ color:#e8b57f; }
+  .fresh.stale{ color:var(--warn-text); }
   .owner-card{ background:var(--panel-raised); border:1px solid var(--accent-dim); border-radius:6px; padding:14px; margin-bottom:12px; }
   .owner-name{ font-family:var(--font-display); font-size:20px; font-weight:700; text-transform:uppercase; line-height:1.15; margin-bottom:8px; text-wrap:balance; overflow-wrap:anywhere; }
   .kv{ display:grid; grid-template-columns:88px 1fr; gap:4px 10px; font-size:13px; margin-bottom:10px; }
@@ -296,13 +341,13 @@
   .btn-row{ display:flex; flex-wrap:wrap; gap:6px; }
   .btn-row > *{ flex:1 1 auto; }
   .small-btn{ background:var(--bg); border:1px solid var(--line); color:var(--text); font-family:var(--font-display); font-size:12.5px; text-transform:uppercase; letter-spacing:.03em; padding:10px 12px; border-radius:4px; text-decoration:none; text-align:center; }
-  .small-btn.go{ background:var(--accent); border-color:var(--accent); color:#1a1a1a; font-weight:600; }
+  .small-btn.go{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
   .area-row{ cursor:pointer; }
   .area-row.current{ border-color:var(--accent-dim); background:var(--panel-raised); }
   .install-box{ background:var(--panel); border:1px dashed var(--line); border-radius:6px; padding:12px; margin-top:4px; }
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(16px + env(safe-area-inset-bottom, 0px)); z-index:300; background:var(--panel-raised); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:10px 12px; display:flex; align-items:center; gap:12px; font-size:13.5px; box-shadow:0 6px 24px rgba(0,0,0,.45); max-width:calc(100% - 32px); }
   .toast button{ background:none; border:1px solid var(--accent); color:var(--accent); font-family:var(--font-display); text-transform:uppercase; font-size:12px; padding:6px 10px; border-radius:4px; }
-  .pending-tag{ font-family:var(--font-mono); font-size:9.5px; color:#e8b57f; border:1px solid #6b5230; border-radius:8px; padding:1px 6px; margin-left:4px; }
+  .pending-tag{ font-family:var(--font-mono); font-size:9.5px; color:var(--warn-text); border:1px solid var(--accent-dim); border-radius:8px; padding:1px 6px; margin-left:4px; }
   button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
   .check-row{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:9px 10px; margin-bottom:5px; }
   .check-row label{ flex:1; min-width:0; font-size:14px; line-height:1.35; cursor:pointer; }
@@ -311,8 +356,8 @@
   .check-progress{ height:6px; background:var(--panel); border-radius:3px; overflow:hidden; margin-bottom:8px; }
   .check-progress > span{ display:block; height:100%; background:var(--ok); }
   .starter-tag{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-dim); border:1px solid var(--line); border-radius:8px; padding:1px 6px; margin-left:6px; }
-  .wx-alert{ background:#3a1c1c; border:1px solid #8a3a3a; border-radius:5px; padding:10px 12px; margin-bottom:6px; }
-  .wx-alert summary{ font-weight:600; font-size:14px; color:#f5a3a3; cursor:pointer; }
+  .wx-alert{ background:var(--danger-bg); border:1px solid var(--danger-line); border-radius:5px; padding:10px 12px; margin-bottom:6px; }
+  .wx-alert summary{ font-weight:600; font-size:14px; color:var(--danger); cursor:pointer; }
   .wx-alert p{ font-size:12.5px; line-height:1.45; white-space:pre-wrap; margin:6px 0 0; color:var(--text); }
   .wx-row{ display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:18px; }
   .wx-cell{ background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:8px 6px; text-align:center; min-width:0; }
@@ -324,33 +369,103 @@
   .zone-label{ background:rgba(22,25,28,.85); color:#f0ede4; border:none; font-family:var(--font-mono); font-size:11px; font-weight:600; padding:2px 6px; border-radius:3px; box-shadow:none; }
   .zone-label::before{ display:none; }
   .sheet-place{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); margin-bottom:12px; line-height:1.5; }
-  .flag-tree .card-name{ color:#f0a35c; } .flag-stay .card-name{ color:#f07a7a; } .flag-done .card-name{ color:#7fe89b; }
+  .flag-tree .card-name{ color:var(--accent); } .flag-stay .card-name{ color:var(--danger); } .flag-done .card-name{ color:var(--ok); }
   .drawing #leafletMap{ outline:3px solid var(--accent); cursor:crosshair; }
+
+  /* ---- v3 field polish: glove-size targets, storm palette ---- */
+  html,body{ font-size:15px; }
+  body{ background:var(--bg); background-image:radial-gradient(120% 60% at 100% 0%, var(--accent-glow), transparent 60%); background-attachment:fixed; }
+  body::before{ background:var(--bg-2); }
+  .topbar{ background:linear-gradient(160deg, var(--bg-2) 0%, var(--bg) 70%); border-bottom:none; box-shadow:0 1px 0 var(--line), var(--shadow); padding-top:12px; }
+  .brand-row{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+  .logo{ width:44px; height:44px; flex-shrink:0; border-radius:12px; box-shadow:0 0 0 1px var(--line); }
+  .brand-text{ flex:1; min-width:0; }
+  .brand-text .eyebrow{ margin:0; }
+  .brand-text h1{ margin:0; font-size:24px; }
+  .brand-tools{ display:flex; align-items:center; gap:8px; }
+  .brand-tools .net-pill{ margin:0; }
+  .theme-btn{ width:44px; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:20px; line-height:1; }
+  .tabs{ gap:4px; padding-bottom:8px; }
+  .tab{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-width:64px; min-height:58px; padding:8px 8px 6px;
+    border-radius:12px; border:1px solid transparent; background:transparent; font-size:11.5px; letter-spacing:.05em; color:var(--text-dim); }
+  .tab-ic{ width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .tab.active{ color:var(--accent-ink); background:var(--accent); border-color:var(--accent); box-shadow:0 4px 14px var(--accent-glow); }
+  main{ padding-top:18px; }
+
+  .locate-btn{ min-height:56px; border-radius:12px; font-size:17px; background:linear-gradient(180deg, var(--accent), var(--accent-press)); box-shadow:0 4px 16px var(--accent-glow); }
+  .locate-btn.secondary{ background:linear-gradient(180deg, var(--blue), #1f5fc4); color:#fff; box-shadow:none; }
+  .add-btn{ min-height:52px; border-radius:10px; font-size:15px; background:var(--ok); color:#fff; }
+  .manage-btn{ min-height:44px; padding:10px 14px; border-radius:10px; font-size:12px; color:var(--text); background:var(--panel); }
+  .small-btn{ min-height:46px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; font-size:13px; background:var(--panel); }
+  .small-btn.go{ background:var(--accent); color:var(--accent-ink); }
+
+  .card{ border-radius:12px; padding:12px 12px 12px 14px; gap:12px; box-shadow:var(--shadow); margin-bottom:8px; }
+  .card.top{ border-color:var(--accent); background:var(--panel-raised); }
+  .card-name{ font-size:15.5px; }
+  .card-sub{ font-size:13px; }
+  .card-phone{ font-size:14px; font-weight:600; color:var(--text); }
+  .icon-btn{ width:46px; height:46px; border-radius:12px; font-size:19px; background:var(--panel-raised); }
+  .icon-btn.call{ background:var(--ok); border-color:var(--ok); color:#fff; }
+  .card-actions{ gap:6px; }
+  .dist-badge{ font-size:16px; min-width:48px; }
+
+  .field input, .field select, .field textarea, #checkNew{ font-size:16px; min-height:48px; padding:12px; border-radius:10px; background:var(--panel); }
+  .field label{ font-size:11px; }
+  .section-label{ font-size:16px; color:var(--text); border-bottom:2px solid var(--line); display:flex; align-items:center; gap:8px; margin-top:4px; }
+  .section-label::before{ content:""; width:6px; height:18px; border-radius:3px; background:var(--accent); flex-shrink:0; }
+  .cat-marker{ border-radius:6px; clip-path:none; padding:3px 8px; color:var(--accent-ink); }
+  .cat-empty{ border-radius:10px; font-size:13px; }
+  .status-pill{ font-size:11px; padding:3px 9px; font-weight:600; }
+  .net-pill{ font-size:11px; padding:5px 10px; font-weight:600; }
+
+  .area-card{ border-radius:14px; border-left-width:6px; background:linear-gradient(135deg, var(--panel-raised), var(--panel)); box-shadow:var(--shadow); padding:16px; }
+  .area-name{ font-size:26px; }
+  .pack-cell{ border-radius:12px; padding:10px 6px; box-shadow:var(--shadow); }
+  .pack-num{ font-size:22px; }
+  .live-cat{ border-radius:12px; min-height:64px; font-size:13px; box-shadow:var(--shadow); }
+  .live-cat.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .storm-link{ border-radius:12px; min-height:72px; box-shadow:var(--shadow); color:var(--text); }
+  .check-row{ border-radius:12px; min-height:54px; padding:10px 12px; }
+  .need-check{ width:28px; height:28px; }
+  .map-toggle{ min-height:44px; border-radius:10px; font-size:12px; }
+  .map-toggle.on{ border-color:var(--accent); color:var(--text); background:var(--panel-raised); }
+  #leafletMap{ border-radius:14px; box-shadow:var(--shadow); }
+  .owner-card{ border-radius:14px; border-color:var(--accent); box-shadow:var(--shadow); }
+  .install-box{ border-radius:12px; }
+  .wx-cell{ border-radius:12px; }
+  .toast{ border-radius:12px; }
+  .gallery-overlay{ background:var(--bg); }
+  .gallery-actions button{ min-height:52px; border-radius:10px; }
+  .gallery-close, .webview-close{ width:46px; height:46px; border-radius:12px; }
   @media (prefers-reduced-motion: reduce){ .alert-flash{ animation:none; } }
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-    <div>
-      <p class="eyebrow">Bedwell Field Ops</p>
+  <div class="brand-row">
+    <svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="110" fill="#13233a"/><rect y="404" width="512" height="108" fill="#ff7a1a"/><path d="M256 78 L372 238 H318 L398 346 H284 V408 H228 V346 H114 L194 238 H140 Z" fill="#eef3f8"/><path d="M300 96 L262 186 H300 L248 286 L272 196 H236 Z" fill="#ff7a1a"/></svg>
+    <div class="brand-text">
+      <p class="eyebrow">Bedwell Tree Service</p>
       <h1>Storm Ops</h1>
     </div>
-    <p id="syncStatus" class="net-pill on">Online</p>
+    <div class="brand-tools">
+      <p id="syncStatus" class="net-pill on">Online</p>
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="Switch light or dark mode">☀</button>
+    </div>
   </div>
   <div class="tabs">
-    <button class="tab active" data-tab="here">Here</button>
-    <button class="tab" data-tab="contacts">Contacts</button>
-    <button class="tab" data-tab="maintenance">Shops</button>
-    <button class="tab" data-tab="owner">Owner</button>
-    <button class="tab" data-tab="sales">Sales</button>
-    <button class="tab" data-tab="jobs">Jobs</button>
-    <button class="tab" data-tab="map">Map</button>
-    <button class="tab" data-tab="safety">Safety</button>
-    <button class="tab" data-tab="needs">Crew</button>
-    <button class="tab" data-tab="notes">Notes</button>
-    <button class="tab" data-tab="ics">ICS</button>
+    <button class="tab active" data-tab="here"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Here</span></button>
+    <button class="tab" data-tab="contacts"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Contacts</span></button>
+    <button class="tab" data-tab="maintenance"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>Shops</span></button>
+    <button class="tab" data-tab="owner"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>Owner</span></button>
+    <button class="tab" data-tab="sales"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg><span>Sales</span></button>
+    <button class="tab" data-tab="jobs"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/><path d="M8.5 17h7"/></svg><span>Jobs</span></button>
+    <button class="tab" data-tab="map"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+    <button class="tab" data-tab="safety"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16h.01"/></svg><span>Safety</span></button>
+    <button class="tab" data-tab="needs"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A5 5 0 0 1 21 19"/></svg><span>Crew</span></button>
+    <button class="tab" data-tab="notes"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5"/><path d="M8 13h8M8 17h6"/></svg><span>Notes</span></button>
+    <button class="tab" data-tab="ics"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>ICS</span></button>
   </div>
 </div>
 
@@ -1387,7 +1502,8 @@ function renderMaintenance(){
     const trustedNames = new Set(trusted.map(t=>t.name.toLowerCase()));
     const found = (liveResults||[])
       .filter(r=>keys.includes(r.catKey) && !trustedNames.has(r.name.toLowerCase()))
-      .slice(0,6);
+      .sort((a,b)=>a.dist-b.dist)
+      .slice(0,4);
 
     if(!trusted.length && !found.length) return '';
 
@@ -1404,7 +1520,7 @@ function renderMaintenance(){
             ${v.notes ? `<div class="card-sub wrap">${escapeHtml(v.notes)}</div>` : ''}
           </div>
           <div class="card-actions">
-            <button class="icon-btn" onclick="openInApp('${mapUrl}','${escapeHtml(v.name).replace(/'/g,"&#39;")}')">📍</button>
+            <a class="icon-btn" href="${v.lat!=null ? `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}` : mapUrl}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
             <button class="icon-btn photo" onclick="openGallery('vendors','${v.id}','${escapeHtml(v.name).replace(/'/g,"&#39;")}')">📷${v.photoIds&&v.photoIds.length?`<span class="pcount">${v.photoIds.length}</span>`:''}</button>
             ${telUrl ? `<a class="icon-btn call" href="${telUrl}">📞</a>` : ''}
           </div>
@@ -1424,7 +1540,7 @@ function renderMaintenance(){
           </div>
           <div class="card-actions">
             <button class="icon-btn star" title="Save as trusted vendor" onclick="saveFoundShop('${r.catKey}',${r.lat},${r.lng})">★</button>
-            <button class="icon-btn" onclick="openInApp('${mapUrl}','${escapeHtml(r.name).replace(/'/g,"&#39;")}')">📍</button>
+            <a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
             ${telUrl ? `<a class="icon-btn call" href="${telUrl}">📞</a>` : ''}
           </div>
         </div>`;
@@ -1910,7 +2026,7 @@ document.getElementById('mapAddressBtn').addEventListener('click', async ()=>{
 // shop can be 100+ miles out. So we start tight and only widen the categories
 // that came back thin, instead of blowing the radius out for everything.
 const RADIUS_STEPS_MI = [20, 50, 75, 100, 125, 150, 200];
-const MIN_RESULTS = 3;
+const MIN_RESULTS = 4; // keep widening until each kind has 4 options to choose from
 
 async function queryOverpassFor(cats, radiusMeters){
   let parts = '';
@@ -2048,7 +2164,7 @@ function renderLiveResults(){
   const byCat = {};
   shown.forEach(r=>{ (byCat[r.catKey] = byCat[r.catKey] || []).push(r); });
   out.innerHTML = LIVE_CATEGORIES.filter(c=>byCat[c.key]).map(cat=>{
-    const list = byCat[cat.key].slice(0, activeFilter === 'all' ? 4 : 25);
+    const list = byCat[cat.key].sort((a,b)=>a.dist-b.dist).slice(0, activeFilter === 'all' ? 4 : 25);
     const rows = list.map(r=>{
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
       const telUrl = r.phone ? `tel:${r.phone.replace(/[^0-9+]/g,'')}` : null;
@@ -2062,7 +2178,7 @@ function renderLiveResults(){
           </div>
           <div class="card-actions">
             <button class="icon-btn star" title="Save as trusted vendor" onclick="saveFoundShop('${r.catKey}',${r.lat},${r.lng})">★</button>
-            <button class="icon-btn" onclick="openInApp('${mapUrl}','${escapeHtml(r.name).replace(/'/g,"&#39;")}')">📍</button>
+            <a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
             ${telUrl ? `<a class="icon-btn call" href="${telUrl}">📞</a>` : ''}
           </div>
         </div>`;
@@ -2541,8 +2657,8 @@ async function onMapClick(e){
   let body;
   if(rows.length){
     body = rows.map(([k,v])=>`<div style="font-size:12px;"><b>${k}:</b> ${escapeHtml(String(v))}</div>`).join('');
-    if(r.p.offline) body += `<div style="font-size:10.5px; color:#9aa1a8; margin-top:4px;">From records saved on this phone ${timeAgo(r.p.time)}.</div>`;
-    if(!r.p.owner) body += `<div style="font-size:10.5px; color:#e8a0a0; margin-top:4px;">This county does not publish owner names in its map data. Use the county GIS site below.</div>`;
+    if(r.p.offline) body += `<div style="font-size:10.5px; color:var(--text-dim); margin-top:4px;">From records saved on this phone ${timeAgo(r.p.time)}.</div>`;
+    if(!r.p.owner) body += `<div style="font-size:10.5px; color:var(--danger); margin-top:4px;">This county does not publish owner names in its map data. Use the county GIS site below.</div>`;
   }else{
     body = `<div style="font-size:11px;">${escapeHtml(parcelProblem(r))}</div>`;
   }
@@ -3055,7 +3171,7 @@ async function brandSearch(i, outId, btn){
   const near = `@${loc.lat},${loc.lng},10z`;
   out.innerHTML = `<div class="category"><div class="cat-head"><span class="cat-marker">${results.length}</span><span class="cat-title">${escapeHtml(b.label)}</span></div>
     ${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}
-    ${results.map((r, j)=>`<div class="card">
+    ${results.map((r, j)=>`<div class="card"${j >= 4 ? ' data-more hidden' : ''}>
       <div class="dist-badge">${r.dist.toFixed(0)}<small>MI</small></div>
       <div class="card-body">
         <div class="card-name">${escapeHtml(r.name)}</div>
@@ -3064,9 +3180,10 @@ async function brandSearch(i, outId, btn){
       </div>
       <div class="card-actions">
         <button class="icon-btn star" onclick="saveBrandHit(${j}, '${escapeHtml(b.label).replace(/'/g,'&#39;')}')" aria-label="Save as trusted vendor">★</button>
-        <a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
+        <a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
         ${r.phone ? `<a class="icon-btn call" href="tel:${r.phone.replace(/[^0-9+]/g,'')}" aria-label="Call">📞</a>` : r.web ? `<a class="icon-btn web" href="${escapeHtml(r.web.startsWith('http') ? r.web : 'https://' + r.web)}" target="_blank" rel="noopener" aria-label="Website">🌐</a>` : ''}
       </div></div>`).join('') || '<div class="cat-empty">None found in the open map data within 150 miles.</div>'}
+    ${results.length > 4 ? `<button class="small-btn" style="display:block; width:100%; margin-top:6px;" onclick="this.parentElement.querySelectorAll('[data-more]').forEach(e=>e.hidden=false); this.remove();">Show ${results.length - 4} more</button>` : ''}
     <a class="small-btn" style="display:block; margin-top:6px;" href="https://www.google.com/maps/search/${encodeURIComponent(b.term)}/${near}" target="_blank" rel="noopener">Not listed? Check Google Maps</a></div>`;
 }
 let brandHits = [];
@@ -3963,6 +4080,21 @@ async function onAppOpen(){
   }
 }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && dataLoaded) onAppOpen(); });
+
+// Light/dark: follows the phone unless you pick one. Light mode is easier to read in direct sun.
+(function themeToggle(){
+  const btn = document.getElementById('themeBtn');
+  const apply = t=>{ if(t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+    const dark = t ? t === 'dark' : !matchMedia('(prefers-color-scheme: light)').matches;
+    btn.textContent = dark ? '☀' : '☾'; btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0d1520' : '#eef2f6'); };
+  let t = null; try{ t = localStorage.getItem('stormops:theme'); }catch(e){}
+  apply(t);
+  btn.addEventListener('click', ()=>{
+    const dark = document.documentElement.getAttribute('data-theme') ? document.documentElement.getAttribute('data-theme') === 'dark' : !matchMedia('(prefers-color-scheme: light)').matches;
+    t = dark ? 'light' : 'dark'; try{ localStorage.setItem('stormops:theme', t); }catch(e){} apply(t);
+  });
+})();
 
 (async function boot(){
   await migrateLocalStorage();
