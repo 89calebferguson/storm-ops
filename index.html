@@ -549,6 +549,7 @@
       <div class="area-sub" id="areaSub">Tap the button when you arrive somewhere new. The app pulls local contacts, shops, the electric utility, and the county's property records, then keeps a copy on this phone for when you lose signal.</div>
     </div>
     <button class="locate-btn" id="arriveBtn" style="font-size:17px; padding:16px;">📍 I'm Here — Load This Area</button>
+    <button class="locate-btn secondary" type="button" onclick="pickSpotOnMap()" style="margin-top:6px;">🗺️ No GPS? Tap my spot on the map</button>
     <div class="ac-wrap" style="margin:8px 0;">
       <div class="field" style="margin:0;"><input type="text" id="hereTownInput" autocomplete="off" placeholder="Or type a town (e.g. Quincy, IL)"></div>
       <div class="ac-list" id="acListHere"></div>
@@ -1388,7 +1389,7 @@ function getLocation(statusEl, onDone, opts = {}){
     const c = best.coords, ft = Math.round((c.accuracy || 0) * 3.28);
     userLoc = { lat: c.latitude, lng: c.longitude, acc: c.accuracy };
     if(c.accuracy > 1500 && !opts.allowCoarse){
-      statusEl.innerHTML = `Your phone is only giving a rough location (within about ${(c.accuracy / 1609).toFixed(1)} miles), so the app can't tell which town or house you're at. ${escapeHtml(PRECISE_TIP)} <button class="small-btn" id="coarseAnyway">Use it anyway</button>`;
+      statusEl.innerHTML = `Your phone is only giving a rough location (within about ${(c.accuracy / 1609).toFixed(1)} miles), so the app can't tell which town or house you're at. This tablet or phone may not have GPS. <button class="small-btn go" onclick="pickSpotOnMap()">📍 Tap my spot on the map</button> <button class="small-btn" id="coarseAnyway">Use it anyway</button>`;
       statusEl.className = 'status-line warn';
       const b = document.getElementById('coarseAnyway');
       if(b) b.onclick = ()=>{ userLoc = { lat: c.latitude, lng: c.longitude, acc: c.accuracy, approx: true }; onDone(); };
@@ -2735,7 +2736,7 @@ function initMap(){
   new CenterCtl().addTo(leafletMap);
 
   drawCityOutlines(leafletMap);
-  leafletMap.on('click', e=>{ if(zoneDraft) addZonePoint(e); else onMapClick(e); });
+  leafletMap.on('click', e=>{ if(pickingSpot) usePickedSpot(e.latlng.lat, e.latlng.lng); else if(zoneDraft) addZonePoint(e); else onMapClick(e); });
   leafletMap.on('dragstart', ()=>{ myDotFollow = false; });
   // long-press (or right-click) drops a pin where GPS can't be trusted
   leafletMap.on('contextmenu', e=> dropPinMenu(leafletMap, e.latlng));
@@ -2784,6 +2785,26 @@ function showAccChip(acc){
   if(acc > 50) setStatus('mapStatus', `GPS is only good to about ${ft.toLocaleString()} ft right now. ${PRECISE_TIP} Long-press the map to drop a pin by hand.`, 'warn');
 }
 
+let pickingSpot = false;
+function pickSpotOnMap(){
+  document.querySelector('.tab[data-tab="map"]').click();
+  setTimeout(()=>{
+    if(!leafletMap) return;
+    const a = currentArea();
+    if(a) leafletMap.setView([a.lat, a.lng], 15);
+    pickingSpot = true;
+    setStatus('mapStatus', 'Zoom in and tap where you are standing. Search a town or address above the map to jump there first.', 'warn');
+    document.getElementById('leafletMap').scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 150);
+}
+async function usePickedSpot(lat, lng){
+  pickingSpot = false;
+  userLoc = { lat, lng, acc: 5, manual: true };
+  if(myDot){ myDot.setLatLng([lat, lng]); myRing.setLatLng([lat, lng]).setRadius(5); }
+  myDotFollow = false;
+  setStatus('mapStatus', 'Spot set by hand. Loading this area…', 'ok');
+  await arriveAt(lat, lng, null, { acc: 5, src:'map' });
+}
 let droppedPin = null;
 function dropPinMenu(map, ll){
   if(droppedPin) map.removeLayer(droppedPin);
@@ -2806,6 +2827,7 @@ async function pinAction(kind){
     userLoc = { lat, lng, acc: 3, manual: true };
     if(myDot){ myDot.setLatLng([lat, lng]); myRing.setLatLng([lat, lng]).setRadius(3); }
     myDotFollow = false; leafletMap.closePopup(); toast('Using the pin as your location.');
+    arriveAt(lat, lng, null, { acc: 3, src:'map' });
     return;
   }
   // flags: look up the lot at the pin first so the flag carries the owner/lot
@@ -5293,7 +5315,7 @@ function callListHtml(a){
 }
 function fixLine(a){
   const f = a.fix || { lat:a.lat, lng:a.lng };
-  const how = f.src === 'typed' ? 'Typed town center' : 'GPS';
+  const how = f.src === 'typed' ? 'Typed town center' : f.src === 'map' ? 'Set by hand on map' : 'GPS';
   return `<div class="fix-line">${how}: <a href="https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}" target="_blank" rel="noopener">${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}</a>${f.acc ? ` · within ${Math.round(f.acc * 3.28).toLocaleString()} ft${f.acc > 50 ? ' <span style="color:var(--danger)">(weak, turn on Precise Location)</span>' : ''}` : ''}${f.time ? ' · ' + timeAgo(f.time) : ''}</div>`;
 }
 function renderWhere(){
