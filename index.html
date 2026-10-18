@@ -3908,18 +3908,38 @@ document.getElementById('debRadius').addEventListener('change', loadDebris);
 // Free sources: state DOT feeds that need no key and allow browser access
 // (ROAD_FEEDS), NWS alerts that mention closed roads, and the crew's own
 // "Road closed" pins. Everywhere else, a link to the state's 511 site.
-const STATE_511 = {};
-const ROAD_FEEDS = []; // { state, url, kind:'wzdx'|'arcgis', label }
+const STATE_511 = { IL:'https://www.gettingaroundillinois.com/', IN:'https://511in.org/', IA:'https://511ia.org/', MO:'https://traveler.modot.org/', WI:'https://511wi.gov/',
+  MI:'https://mdotjboss.state.mi.us/MiDrive/map', OH:'https://www.ohgo.com/', KY:'https://goky.ky.gov/', MN:'https://511mn.org/', TN:'https://smartway.tn.gov/' };
+// Checked 2026-10-18: free, no key, and open to browsers (CORS). MN, WI, KY and
+// MO publish free feeds too, but browsers are blocked from reading them.
+const iaDay = ()=> new Date().toISOString().slice(0,10).replace(/-/g, '');
+const ROAD_FEEDS = [
+  { states:['IL'], label:'IDOT road closures', kind:'arcgis', url:'https://services2.arcgis.com/aIrBD8yn1TDTEXoz/ArcGIS/rest/services/ClosureIncidents/FeatureServer/0',
+    text: p=> [p.ConstructionType || p.ClosureType, p.Location, p.NearTown, p.DetourRoute ? 'Detour: ' + p.DetourRoute : '', p.EndDate ? 'Until ' + new Date(p.EndDate).toLocaleDateString() : ''].filter(Boolean).join(' · '),
+    closed: p=> /closed/i.test((p.ConstructionType || '') + ' ' + (p.ClosureType || '')), road: p=> p.St_Name || '', skip: p=> p.EndDate && p.EndDate < Date.now() },
+  { states:['IA'], label:'Iowa 511', kind:'arcgis', url:'https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/CARS511_Iowa_View/FeatureServer/0',
+    text: p=> p.headline || p.msg0 || [p.Route, p.phrase, p.cause].filter(Boolean).join(' '), closed: p=> p.STYLE === 'closure' || /closed/i.test(p.phrase || ''), road: p=> p.Route || '',
+    skip: p=> p.ExpireDate && String(p.ExpireDate) < iaDay() },
+  { states:['IA'], label:'Iowa county roads', kind:'arcgis', url:'https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/511_IA_Counties_View/FeatureServer/0',
+    text: p=> [p.name, p.description, p.organization, p.organization_phone].filter(Boolean).join(' · '), closed: p=> /impassable|closed/i.test((p.subtype || '') + ' ' + (p.name || '')), road: p=> p.road || '' },
+  { states:['IN'], label:'INDOT', kind:'wzdx', url:'https://in.carsprogram.org/carsapi_v1/api/wzdx' },
+  { states:['ND'], label:'NDDOT', kind:'wzdx', url:'https://travelfiles.dot.nd.gov/geojson_nc/wzdx_geojson.json' },
+  { states:['NH','VT','ME'], label:'New England 511', kind:'wzdx', url:'https://api.dx.ne-compass.com/wzdx-latest/' },
+  { states:['MS'], label:'MDOT', kind:'wzdx', url:'https://api.mdottraffic.com/prod/v3/data/wzdx' },
+  { states:['NY'], label:'511NY', kind:'wzdx', url:'https://511ny.org/api/wzdx' }
+];
 async function loadRoadClosures(c, radiusMi){
   const a = currentArea(), st = (a && a.stateCode) || '';
   const items = [], failed = [];
   const near = (y, x)=> distMiles(c.lat, c.lng, y, x) <= radiusMi;
-  for(const f of ROAD_FEEDS.filter(f=> f.state === st || stormStates().split(',').slice(0, 3).includes(f.state))){
+  const want = st ? [st].concat(stormStates().split(',').slice(1, 3)) : [];
+  for(const f of ROAD_FEEDS.filter(f=> f.states.some(x=> want.includes(x)))){
     try{
       if(f.kind === 'wzdx'){
-        const d = await fetchJSON(f.url, {}, 20000);
+        const d = await fetchJSON(f.url, { headers:{ 'Accept':'application/json' } }, 20000);
         (d.features || []).forEach(ft=>{
           const p = ft.properties || {}, core = p.core_details || p;
+          if(p.end_date && Date.parse(p.end_date) < Date.now()) return;
           const pt = firstPoint(ft.geometry); if(!pt || !near(pt[1], pt[0])) return;
           const closed = /all-lanes-closed|closed/i.test(p.vehicle_impact || '') || /closure|closed/i.test(core.description || '');
           items.push({ src: f.label, lat: pt[1], lng: pt[0], geom: ft.geometry, closed, road: (core.road_names || []).join(', '), text: core.description || core.event_type || 'Work zone', start: p.start_date || '', end: p.end_date || '' });
@@ -3928,7 +3948,7 @@ async function loadRoadClosures(c, radiusMi){
         const env = `${c.lng - 1},${c.lat - .8},${c.lng + 1},${c.lat + .8}`;
         const d = await fetchJSON(`${f.url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&resultRecordCount=500&f=geojson`, {}, 20000);
         (d.features || []).forEach(ft=>{
-          const p = ft.properties || {}, pt = firstPoint(ft.geometry); if(!pt || !near(pt[1], pt[0])) return;
+          const p = ft.properties || {}, pt = firstPoint(ft.geometry); if(!pt || !near(pt[1], pt[0]) || (f.skip && f.skip(p))) return;
           const text = f.text ? f.text(p) : Object.values(p).filter(v=>typeof v === 'string' && v.length > 15).slice(0, 2).join(' · ');
           items.push({ src: f.label, lat: pt[1], lng: pt[0], geom: ft.geometry, closed: f.closed ? f.closed(p) : /clos/i.test(text), road: f.road ? f.road(p) : '', text, start:'', end:'' });
         });
@@ -3946,7 +3966,7 @@ async function loadRoadClosures(c, radiusMi){
   marks.filter(m=> m.type === 'road' && m.lat != null && near(m.lat, m.lng)).forEach(m=> items.push({ src:'Your crew', lat:m.lat, lng:m.lng, closed:true, road: m.address || '', text: m.note || 'Road closed', time: m.time }));
   items.forEach(x=> x.dist = distMiles(c.lat, c.lng, x.lat, x.lng));
   items.sort((p, q)=> (q.closed - p.closed) || (p.dist - q.dist));
-  return { items, failed, state: st, feeds: ROAD_FEEDS.filter(f=>f.state === st).length };
+  return { items, failed, state: st, feeds: ROAD_FEEDS.filter(f=>f.states.includes(st)).length };
 }
 function firstPoint(g){
   if(!g) return null;
