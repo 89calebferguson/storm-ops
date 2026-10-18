@@ -274,6 +274,32 @@
   .webview-fallback a{ background:var(--accent); color:var(--accent-ink); text-decoration:none; padding:12px 24px; border-radius:4px; font-family:var(--font-display); font-weight:700; text-transform:uppercase; font-size:13px; }
 
   /* live nearby search */
+  #salesMap.drawing{ outline:3px solid #ffd166; cursor:crosshair; }
+  .shop-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin:2px 0 8px; }
+  .shop-town{ font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1.1; }
+  .shop-chips{ display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; margin:0 -2px; scrollbar-width:none; }
+  .shop-chips::-webkit-scrollbar{ display:none; }
+  .shop-chip{ flex:0 0 auto; border:1px solid var(--line); background:var(--panel); color:var(--text); border-radius:18px; padding:8px 12px; font-size:13.5px; white-space:nowrap; }
+  .shop-chip b{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-left:3px; }
+  .shop-chip.on{ background:#ff7a1a; border-color:#ff7a1a; color:#fff; } .shop-chip.on b{ color:#fff; }
+  .shop-chip.none{ opacity:.45; }
+  .shop-group{ font-family:var(--font-display); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-dim); margin:16px 0 6px; }
+  .shop-cat{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; margin:10px 0 6px; }
+  .shop-cat .ic{ font-size:18px; }
+  .shop-card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-bottom:7px; box-shadow:var(--shadow); }
+  .shop-card.trusted{ border-color:var(--gold-text); }
+  .shop-top{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .shop-name{ font-weight:650; font-size:15px; }
+  .shop-dist{ font-family:var(--font-mono); font-size:13px; color:var(--accent); white-space:nowrap; }
+  .shop-sub{ font-size:12.5px; color:var(--text-dim); margin-top:2px; }
+  .shop-btns{ display:flex; gap:6px; margin-top:9px; }
+  .shop-btns > *{ flex:1; text-align:center; text-decoration:none; padding:9px 6px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:13.5px; font-weight:600; }
+  .shop-btns .call{ background:var(--ok); border-color:var(--ok); color:#fff; }
+  .shop-btns .star{ flex:0 0 44px; color:var(--gold-text); }
+  .shop-more{ display:block; width:100%; background:none; border:none; color:var(--accent); font-weight:600; padding:6px; font-size:13.5px; }
+  .brand-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .brand-chips .live-cat{ display:inline-flex; align-items:center; gap:5px; padding:8px 12px; border-radius:18px; font-size:13px; min-height:0; flex-direction:row; text-transform:none; }
+  .brand-chips .live-cat .lc-icon{ font-size:15px; margin:0; }
   .job-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .job-num{ font-family:var(--font-mono); font-size:15px; font-weight:700; color:var(--accent, #ff7a1a); }
   .job-lbl{ display:block; font-family:var(--font-display); font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dim); margin:12px 0 6px; }
@@ -691,20 +717,26 @@
 
   <!-- MAINTENANCE VIEW -->
   <div class="view" id="view-maintenance">
-    <button class="locate-btn" id="locateBtnMaint" style="font-size:17px; padding:16px;">🔧 Find Vendors Near Me</button>
-    <div class="ac-wrap" style="margin:8px 0;">
-      <div class="field" style="margin:0;">
-        <input type="text" id="maintAddressInput" autocomplete="off" placeholder="Or start typing a town…">
-      </div>
-      <div class="ac-list" id="acListMaint"></div>
+    <div class="shop-head">
+      <div><p class="eyebrow">Shops &amp; services near</p><div class="shop-town" id="shopTown">your area</div></div>
+      <button class="small-btn" id="locateBtnMaint">↻ Refresh</button>
     </div>
-    <button class="locate-btn secondary" id="maintAddressBtn" style="margin-bottom:8px;">Use This Location</button>
-    <div class="status-line" id="statusMaint">Tap the button — it finds every vendor category around you automatically.</div>
+    <div class="status-line" id="statusMaint"></div>
+    <div class="shop-chips" id="shopChips"></div>
+    <div id="maintResults"></div>
 
-    <p class="section-label">Equipment Dealers</p>
-    <p style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin:0 0 8px;">Tap a brand to search the open map for dealers and service shops within 150 miles. Results are saved for no-signal use.</p>
-    <div class="live-cats" id="brandCatsMaint"></div>
+    <p class="section-label" style="margin-top:18px;">Equipment Dealers &amp; Specialty</p>
+    <p class="hint">Tap one to search up to 150 miles out.</p>
+    <div class="brand-chips" id="brandCatsMaint"></div>
     <div id="brandResultsMaint" style="margin-bottom:16px;"></div>
+
+    <details class="job-more"><summary>Search near a different town</summary>
+      <div class="ac-wrap" style="margin:8px 0;">
+        <div class="field" style="margin:0;"><input type="text" id="maintAddressInput" autocomplete="off" placeholder="Start typing a town…"></div>
+        <div class="ac-list" id="acListMaint"></div>
+      </div>
+      <button class="locate-btn secondary" id="maintAddressBtn" style="margin-bottom:8px;">Search There</button>
+    </details>
 
     <button class="manage-btn" id="manageToggleMaint">+ Add Trusted Vendor</button>
     <div class="manage-panel" id="managePanelMaint">
@@ -723,7 +755,6 @@
       </div>
     </div>
 
-    <div id="maintResults"></div>
   </div>
 
   <!-- SALES VIEW -->
@@ -795,6 +826,9 @@
     <div class="manage-panel" id="managePanelJobs">
       <div class="job-head"><h2 style="margin:0;">New Job</h2><span class="job-num" id="jNumShow">#1001</span></div>
       <input type="hidden" id="jNumber">
+      <label class="job-lbl" style="margin-top:0;">Photos</label>
+      <div class="job-photos" id="jPhotoStrip"><button type="button" class="job-add-photo" id="jPhotoBtn">📷<span>Add</span></button></div>
+      <input type="file" id="jPhotoInput" accept="image/*" multiple style="display:none;">
       <label class="job-lbl">What's the work?</label>
       <div class="job-chips" id="jWorkChips">
         <button type="button" class="job-chip on" data-v="Tree removal">🌳 Tree</button>
@@ -809,9 +843,6 @@
         <div class="field" style="flex:1; margin:0;"><input type="text" id="jAddress" placeholder="Street address"></div>
         <button type="button" class="small-btn" id="jHereBtn" title="Use where I am">📍 Here</button>
       </div>
-      <label class="job-lbl">Photos</label>
-      <div class="job-photos" id="jPhotoStrip"><button type="button" class="job-add-photo" id="jPhotoBtn">📷<span>Add</span></button></div>
-      <input type="file" id="jPhotoInput" accept="image/*" multiple style="display:none;">
       <details class="job-more"><summary>More details (crew, hazards, notes)</summary>
         <div class="field"><label>Status</label><select id="jStatus"><option>Scheduled</option><option>In Progress</option><option>Completed</option></select></div>
         <div class="field"><label>Crew</label><input type="text" id="jCrew" placeholder="e.g. Brandon's crew"></div>
@@ -1305,17 +1336,19 @@ const LIVE_CATEGORIES = [
   { key:'sawmill', label:'Sawmill / Logs', icon:'🪓', filters:[['craft','sawmill'],['industrial','sawmill']] },
   { key:'farm',    label:'Farm & Fleet',   icon:'🧰', filters:[['shop','agrarian'],['shop','farm']] }
 ];
+// re: name/brand match. tags: map tags that mean this kind of shop even
+// without the name. words: what to type into the free Photon search.
 const BRAND_SEARCHES = [
-  { label:'Vermeer',        icon:'🌲', term:'Vermeer dealer', re:'vermeer' },
-  { label:'John Deere',     icon:'🚜', term:'John Deere dealer', re:'john deere|deere' },
-  { label:'Altec',          icon:'🏗️', term:'Altec dealer service', re:'altec' },
-  { label:'Palfinger',      icon:'🏗️', term:'Palfinger crane dealer', re:'palfinger' },
-  { label:'Manitou',        icon:'🏗️', term:'Manitou dealer', re:'manitou' },
-  { label:'Stihl',          icon:'🪚', term:'Stihl dealer', re:'stihl' },
-  { label:'Hydraulic Hose', icon:'🔗', term:'hydraulic hose fittings shop', re:'hydraulic|hose|fluid power' },
-  { label:'Mobile Welder',  icon:'🔥', term:'mobile welding repair service', re:'weld|fabricat' },
-  { label:'Equip Rental',   icon:'🏗️', term:'heavy equipment rental', re:'rental|rent-all|sunbelt|united rentals|herc' },
-  { label:'Semi Towing',    icon:'🚛', term:'heavy duty semi towing recovery', re:'towing|wrecker|recovery' }
+  { label:'Vermeer',        icon:'🌲', term:'Vermeer dealer', re:'vermeer', words:['Vermeer'] },
+  { label:'John Deere',     icon:'🚜', term:'John Deere dealer', re:'john deere|deere', words:['John Deere'] },
+  { label:'Altec',          icon:'🏗️', term:'Altec dealer service', re:'altec', words:['Altec'] },
+  { label:'Palfinger',      icon:'🏗️', term:'Palfinger crane dealer', re:'palfinger', words:['Palfinger'] },
+  { label:'Manitou',        icon:'🏗️', term:'Manitou dealer', re:'manitou|gehl|mustang', words:['Manitou', 'Gehl'] },
+  { label:'Stihl',          icon:'🪚', term:'Stihl dealer', re:'stihl', words:['Stihl'] },
+  { label:'Hydraulic Hose', icon:'🔗', term:'hydraulic hose fittings shop', re:'hydraulic|hose|fluid power|pirtek|parker', words:['Hydraulic', 'Pirtek'] },
+  { label:'Mobile Welder',  icon:'🔥', term:'mobile welding repair service', re:'weld|fabricat', words:['Welding'], tags:[['craft','welder'],['craft','metal_construction']] },
+  { label:'Equip Rental',   icon:'🏗️', term:'heavy equipment rental', re:'rental|rent-all|rent all|sunbelt|united rentals|herc|h&e|bigge', words:['Equipment Rental', 'Sunbelt Rentals', 'United Rentals', 'Herc Rentals'], tags:[['shop','rental'],['shop','tool_hire'],['shop','equipment_rental']] },
+  { label:'Semi Towing',    icon:'🚛', term:'heavy duty semi towing recovery', re:'towing|wrecker|recovery', words:['Towing', 'Wrecker'], tags:[['shop','towing'],['service','towing'],['craft','towing']] }
 ];
 // liveSearchLayer is declared near the top alongside leafletMap
 let liveResults = [];
@@ -1658,14 +1691,15 @@ function renderIcs213(){
 const mCategorySelect = document.getElementById('mCategory');
 CATEGORIES.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; mCategorySelect.appendChild(o); });
 
-document.getElementById('locateBtnMaint').addEventListener('click', ()=>{
+document.getElementById('locateBtnMaint').addEventListener('click', async ()=>{
   const statusEl = document.getElementById('statusMaint');
-  getLocation(statusEl, async ()=>{
-    statusEl.textContent = 'Finding vendors nearby…'; statusEl.className = 'status-line';
-    await findEverything();
-    statusEl.textContent = liveResults.length + ' vendors found nearby.'; statusEl.className = 'status-line ok';
-    renderMaintenance(); renderSales();
-  });
+  const loc = workLoc();
+  if(!loc){ statusEl.textContent = 'Load your town on the Here tab first.'; statusEl.className = 'status-line warn'; return; }
+  userLoc = userLoc && userLoc === loc ? userLoc : { ...loc, manual: true };
+  statusEl.textContent = 'Finding shops nearby…'; statusEl.className = 'status-line';
+  await findEverything({ force:true });
+  statusEl.textContent = liveResults.length + ' places found.'; statusEl.className = 'status-line ok';
+  renderMaintenance(); renderSales();
 });
 document.getElementById('maintAddressBtn').addEventListener('click', async ()=>{
   const address = document.getElementById('maintAddressInput').value.trim();
@@ -1733,70 +1767,63 @@ const OSM_TO_VENDOR = {
   'Hospital / Medical':          ['medical']
 };
 
+// Shops tab: what crews need most first, a chip row to jump to one kind,
+// and the 3 closest of each with big Call / Go buttons.
+const SHOP_LAYOUT = [
+  { group:'Need it now', cats:[['Gas Stations','⛽','Fuel'], ['Food','🍔','Food'], ['Hotels','🛏️','Hotels'], ['Hospital / Medical','🏥','Medical']] },
+  { group:'Trucks & equipment', cats:[['Diesel Mechanics','🔧','Repair'], ['Tire Service (Truck/HD)','🛞','Tires'], ['Auto Parts Stores','🔩','Parts'], ['Hydraulic Hose & Fittings','🔗','Hydraulic'], ['Welding & Fabrication','🔥','Welding'], ['Equipment Rental','🏗️','Rental'], ['Hardware & Farm Supply','🧰','Hardware'], ['Semi Towing & Recovery','🚛','Towing'], ['Ford HD/Semi Truck Service','🚚','Ford HD'], ['Chevy HD Truck Dealerships','🚚','Chevy HD']] },
+  { group:'Dealers', cats:[['Vermeer Dealers','🌲','Vermeer'], ['John Deere Dealers','🚜','Deere'], ['Stihl Dealers','🪚','Stihl'], ['Altec Dealers','🏗️','Altec'], ['Palfinger Dealers','🏗️','Palfinger'], ['Manitou Dealers','🏗️','Manitou']] },
+  { group:'Wood & debris', cats:[['Debris Disposal & Mulch Yards','🪵','Debris'], ['Sawmill / Log Buyer','🪓','Sawmill']] }
+];
+let shopFilter = 'all';
+function shopRows(cat){
+  const here = workLoc();
+  let trusted = vendors.filter(v=>v.category===cat).map(v=>({ ...v, trusted:true, dist: here && v.lat!=null ? distMiles(here.lat,here.lng,v.lat,v.lng) : null }));
+  trusted.sort((a,b)=>(a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist));
+  const keys = OSM_TO_VENDOR[cat] || [];
+  const names = new Set(trusted.map(t=>t.name.toLowerCase()));
+  const found = (liveResults||[]).filter(r=>keys.includes(r.catKey) && !names.has(r.name.toLowerCase())).sort((a,b)=>a.dist-b.dist).slice(0, 6);
+  return trusted.concat(found);
+}
+function shopCard(r){
+  const go = r.lat!=null ? `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address || r.name)}`;
+  const tel = r.phone ? `tel:${r.phone.replace(/[^0-9+]/g,'')}` : '';
+  const sub = [r.address, r.hours, r.phone].filter(Boolean).map(escapeHtml).join(' · ') || 'No address listed';
+  return `<div class="shop-card${r.trusted ? ' trusted' : ''}">
+    <div class="shop-top"><div class="shop-name">${r.trusted ? '★ ' : ''}${escapeHtml(r.name)}</div><div class="shop-dist">${r.dist!=null ? r.dist.toFixed(1) + ' mi' : ''}</div></div>
+    <div class="shop-sub">${sub}</div>
+    ${r.notes ? `<div class="shop-sub">${escapeHtml(r.notes)}</div>` : ''}
+    <div class="shop-btns">
+      ${tel ? `<a class="call" href="${tel}">📞 Call</a>` : ''}
+      <a href="${go}" target="_blank" rel="noopener">📍 Go</a>
+      ${r.trusted ? `<button onclick="openGallery('vendors','${r.id}','${escapeHtml(r.name).replace(/'/g,"&#39;")}')">📷${r.photoIds && r.photoIds.length ? ' ' + r.photoIds.length : ''}</button>` : `<button class="star" title="Save as trusted" onclick="${r.starJs || `saveFoundShop('${r.catKey}',${r.lat},${r.lng})`}">★</button>`}
+    </div></div>`;
+}
 function renderMaintenance(){
   const results = document.getElementById('maintResults');
-  const anyLive = liveResults && liveResults.length;
-  if(!vendors.length && !anyLive){
-    results.innerHTML = `<div class="empty-state">Tap "Find Vendors Near Me" above and this fills in automatically.<br><br>Equipment dealers use the brand buttons.</div>`;
+  const a = currentArea();
+  const town = document.getElementById('shopTown'); if(town) town.textContent = a ? bareTown(a.town) + (a.stateCode ? ', ' + a.stateCode : '') : 'your area';
+  const chips = document.getElementById('shopChips');
+  const rows = {}; let total = 0;
+  SHOP_LAYOUT.forEach(g=> g.cats.forEach(([cat])=>{ rows[cat] = shopRows(cat); total += rows[cat].length; }));
+  if(!total){
+    chips.innerHTML = '';
+    results.innerHTML = `<div class="empty-state">Nothing loaded yet for this area.<br>Tap ↻ Refresh above.</div>`;
     return;
   }
-  results.innerHTML = CATEGORIES.map(cat=>{
-    // trusted vendors first, then whatever the live search turned up
-    let trusted = vendors.filter(v=>v.category===cat);
-    if(userLoc) trusted = trusted.map(v=>({...v, dist: v.lat!=null ? distMiles(userLoc.lat,userLoc.lng,v.lat,v.lng) : null}));
-    trusted.sort((a,b)=>(a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist));
-
-    const keys = OSM_TO_VENDOR[cat] || [];
-    const trustedNames = new Set(trusted.map(t=>t.name.toLowerCase()));
-    const found = (liveResults||[])
-      .filter(r=>keys.includes(r.catKey) && !trustedNames.has(r.name.toLowerCase()))
-      .sort((a,b)=>a.dist-b.dist)
-      .slice(0,4);
-
-    if(!trusted.length && !found.length) return '';
-
-    const trustedRows = trusted.map(v=>{
-      const mapUrl = v.lat!=null ? `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address)}`;
-      const telUrl = v.phone ? `tel:${v.phone.replace(/[^0-9+]/g,'')}` : null;
-      return `
-        <div class="card top">
-          <div class="dist-badge">${v.dist!=null ? v.dist.toFixed(1) : '—'}<small>${v.dist!=null?'MI':''}</small></div>
-          <div class="card-body">
-            <div class="card-name">★ ${escapeHtml(v.name)}${v.pendingGeo ? '<span class="pending-tag">no pin yet</span>' : ''}</div>
-            <div class="card-sub">${escapeHtml(v.address)}</div>
-            ${v.phone ? `<div class="card-phone">${escapeHtml(v.phone)}</div>` : ''}
-            ${v.notes ? `<div class="card-sub wrap">${escapeHtml(v.notes)}</div>` : ''}
-          </div>
-          <div class="card-actions">
-            <a class="icon-btn" href="${v.lat!=null ? `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}` : mapUrl}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
-            <button class="icon-btn photo" onclick="openGallery('vendors','${v.id}','${escapeHtml(v.name).replace(/'/g,"&#39;")}')">📷${v.photoIds&&v.photoIds.length?`<span class="pcount">${v.photoIds.length}</span>`:''}</button>
-            ${telUrl ? `<a class="icon-btn call" href="${telUrl}">📞</a>` : ''}
-          </div>
-        </div>`;
+  const chip = (key, label, n)=>`<button class="shop-chip${shopFilter === key ? ' on' : ''}${n === 0 ? ' none' : ''}" onclick="shopFilter='${key.replace(/'/g,"\\'")}'; renderMaintenance();">${label}${n != null ? `<b>${n}</b>` : ''}</button>`;
+  chips.innerHTML = chip('all', 'All', null) + SHOP_LAYOUT.flatMap(g=> g.cats.filter(([cat])=> rows[cat].length).map(([cat, ic, short])=> chip(cat, ic + ' ' + short, rows[cat].length))).join('');
+  results.innerHTML = SHOP_LAYOUT.map(g=>{
+    const cats = g.cats.filter(([cat])=> rows[cat].length && (shopFilter === 'all' || shopFilter === cat));
+    if(!cats.length) return '';
+    return `${shopFilter === 'all' ? `<div class="shop-group">${g.group}</div>` : ''}` + cats.map(([cat, ic])=>{
+      const list = rows[cat], show = shopFilter === 'all' ? 3 : 6;
+      return `<div class="category"><div class="shop-cat"><span class="ic">${ic}</span>${escapeHtml(cat)}</div>
+        ${list.slice(0, show).map(shopCard).join('')}
+        ${list.length > show ? `<div hidden>${list.slice(show).map(shopCard).join('')}</div><button class="shop-more" onclick="this.previousElementSibling.hidden=false; this.remove();">Show ${list.length - show} more</button>` : ''}
+      </div>`;
     }).join('');
-
-    const foundRows = found.map(r=>{
-      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
-      const telUrl = r.phone ? `tel:${r.phone.replace(/[^0-9+]/g,'')}` : null;
-      return `
-        <div class="card">
-          <div class="dist-badge">${r.dist.toFixed(1)}<small>MI</small></div>
-          <div class="card-body">
-            <div class="card-name">${escapeHtml(r.name)}</div>
-            <div class="card-sub">${escapeHtml(r.address) || 'No address listed'}</div>
-            ${r.phone ? `<div class="card-phone">${escapeHtml(r.phone)}</div>` : ''}
-          </div>
-          <div class="card-actions">
-            <button class="icon-btn star" title="Save as trusted vendor" onclick="saveFoundShop('${r.catKey}',${r.lat},${r.lng})">★</button>
-            <a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
-            ${telUrl ? `<a class="icon-btn call" href="${telUrl}">📞</a>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-
-    const total = trusted.length + found.length;
-    return `<div class="category"><div class="cat-head"><span class="cat-marker">${total}</span><span class="cat-title">${cat}</span></div>${trustedRows}${foundRows}</div>`;
-  }).filter(Boolean).join('');
+  }).join('');
 }
 
 // Mirror the brand dealer buttons and town autocomplete onto the Maint tab.
@@ -2796,8 +2823,13 @@ function startMyDot(){
     // a rough cell-tower reading right after a good GPS one is noise; skip it
     if(userLoc && userLoc.acc && acc > userLoc.acc * 3 && Date.now() - lastGood < 15000) return;
     if(acc <= 25) lastGood = Date.now();
-    userLoc = { lat: ll[0], lng: ll[1], acc };
     showAccChip(acc);
+    // A Wi-Fi tablet's "location" is miles off (it put Lansing in Chicago).
+    // Never move the map or the working spot for a reading like that, and
+    // never override a spot set by hand unless real GPS shows up.
+    if(acc > 1500) return;
+    if(userLoc && userLoc.manual && acc > 50) return;
+    userLoc = { lat: ll[0], lng: ll[1], acc };
     if(!myDot){
       myRing = L.circle(ll, { radius: acc, color:'#2f80ed', weight:1, fillColor:'#2f80ed', fillOpacity:.12, interactive:false }).addTo(leafletMap);
       myDot = L.circleMarker(ll, { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).bindPopup('You are here').addTo(leafletMap);
@@ -2819,9 +2851,10 @@ function showAccChip(acc){
   }
   const ft = Math.round(acc * 3.28), el = accCtl.getContainer();
   el.className = 'acc-chip ' + (acc <= 10 ? 'good' : acc <= 50 ? 'ok' : 'bad');
-  el.innerHTML = `GPS ±${ft.toLocaleString()} ft${acc > 50 ? ' · weak' : acc <= 10 ? ' · sharp' : ' · refining'}`;
+  el.innerHTML = acc > 1500 ? 'No GPS on this device · long-press to set your spot' : `GPS ±${ft.toLocaleString()} ft${acc > 50 ? ' · weak' : acc <= 10 ? ' · sharp' : ' · refining'}`;
   el.onclick = acc > 50 ? ()=> toast(PRECISE_TIP) : null;
-  if(acc > 50) setStatus('mapStatus', `GPS is only good to about ${ft.toLocaleString()} ft right now. ${PRECISE_TIP} Long-press the map to drop a pin by hand.`, 'warn');
+  if(acc > 1500) setStatus('mapStatus', `This device has no GPS, so the map stays on ${bareTown((currentArea() || {}).town || 'your area')}. Long-press the map where you are to set your spot.`, 'warn');
+  else if(acc > 50) setStatus('mapStatus', `GPS is only good to about ${ft.toLocaleString()} ft right now. ${PRECISE_TIP} Long-press the map to drop a pin by hand.`, 'warn');
 }
 
 let pickingSpot = false;
@@ -3601,7 +3634,7 @@ function renderOutages(){
 async function brandSearch(i, outId, btn){
   const b = BRAND_SEARCHES[i];
   const out = document.getElementById(outId);
-  const loc = userLoc || (currentArea() ? { lat: currentArea().lat, lng: currentArea().lng } : null);
+  const loc = workLoc();
   if(!loc){ out.innerHTML = '<div class="cat-empty">Load an area or tap "Find" first so the app knows where you are.</div>'; return; }
   document.querySelectorAll('#' + (outId === 'brandResults' ? 'brandCats' : 'brandCatsMaint') + ' .live-cat').forEach(x=>x.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -3610,20 +3643,9 @@ async function brandSearch(i, outId, btn){
   if(navigator.onLine){
     out.innerHTML = `<div class="cat-empty">Searching for ${escapeHtml(b.label)} within 150 miles…</div>`;
     try{
-      const R = 240000, re = b.re.replace(/"/g, '');
-      const q = `[out:json][timeout:40];(nwr["name"~"${re}",i](around:${R},${loc.lat},${loc.lng});nwr["brand"~"${re}",i](around:${R},${loc.lat},${loc.lng}););out center tags 200;`;
-      const d = await overpass(q, 45000);
-      const seen = new Set();
-      results = (d.elements || []).map(el=>{
-        const la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon), t = el.tags || {};
-        if(!la || !t.name) return null;
-        // skip things that just happen to match, like roads and schools
-        if(t.highway || t.amenity === 'school' || t.leisure || t.natural || t.place || t.railway || t.waterway) return null;
-        const k = t.name + la.toFixed(3); if(seen.has(k)) return null; seen.add(k);
-        return { name:t.name, catKey:'brand', address:[t['addr:housenumber'], t['addr:street'], t['addr:city']].filter(Boolean).join(' '),
-          phone: t.phone || t['contact:phone'] || '', web: t.website || t['contact:website'] || '', lat:la, lng:lo };
-      }).filter(Boolean);
-      await setJSON(key, { time: Date.now(), results });
+      results = await brandFind(b, loc, n=> out.innerHTML = `<div class="cat-empty">Searching for ${escapeHtml(b.label)} within ${n} miles…</div>`);
+      if(results.length) await setJSON(key, { time: Date.now(), results });
+      else if(saved && saved.results.length){ results = null; }
     }catch(e){ note = 'Search failed, the map servers may be busy. '; }
   }
   if(!results && saved){ results = saved.results; note += `Showing the list saved ${timeAgo(saved.time)}. `; }
@@ -3631,22 +3653,61 @@ async function brandSearch(i, outId, btn){
   results = results.map(r=>({ ...r, dist: distMiles(loc.lat, loc.lng, r.lat, r.lng) })).sort((x,y)=>x.dist-y.dist).slice(0, 15);
   brandHits = results;
   const near = `@${loc.lat},${loc.lng},10z`;
-  out.innerHTML = `<div class="category"><div class="cat-head"><span class="cat-marker">${results.length}</span><span class="cat-title">${escapeHtml(b.label)}</span></div>
+  const lbl = escapeHtml(b.label).replace(/'/g,'&#39;');
+  out.innerHTML = `<div class="category"><div class="shop-cat"><span class="ic">${b.icon}</span>${escapeHtml(b.label)} <span class="shop-sub" style="margin:0 0 0 auto;">${results.length} found</span></div>
     ${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}
-    ${results.map((r, j)=>`<div class="card"${j >= 4 ? ' data-more hidden' : ''}>
-      <div class="dist-badge">${r.dist.toFixed(0)}<small>MI</small></div>
-      <div class="card-body">
-        <div class="card-name">${escapeHtml(r.name)}</div>
-        <div class="card-sub">${escapeHtml(r.address) || 'No address in map data'}</div>
-        ${r.phone ? `<div class="card-phone">${escapeHtml(r.phone)}</div>` : ''}
-      </div>
-      <div class="card-actions">
-        <button class="icon-btn star" onclick="saveBrandHit(${j}, '${escapeHtml(b.label).replace(/'/g,'&#39;')}')" aria-label="Save as trusted vendor">★</button>
-        <a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}" target="_blank" rel="noopener" aria-label="Directions">📍</a>
-        ${r.phone ? `<a class="icon-btn call" href="tel:${r.phone.replace(/[^0-9+]/g,'')}" aria-label="Call">📞</a>` : r.web ? `<a class="icon-btn web" href="${escapeHtml(r.web.startsWith('http') ? r.web : 'https://' + r.web)}" target="_blank" rel="noopener" aria-label="Website">🌐</a>` : ''}
-      </div></div>`).join('') || '<div class="cat-empty">None found in the open map data within 150 miles.</div>'}
-    ${results.length > 4 ? `<button class="small-btn" style="display:block; width:100%; margin-top:6px;" onclick="this.parentElement.querySelectorAll('[data-more]').forEach(e=>e.hidden=false); this.remove();">Show ${results.length - 4} more</button>` : ''}
-    <a class="small-btn" style="display:block; margin-top:6px;" href="https://www.google.com/maps/search/${encodeURIComponent(b.term)}/${near}" target="_blank" rel="noopener">Not listed? Check Google Maps</a></div>`;
+    ${results.slice(0, 4).map((r, j)=> shopCard({ ...r, starJs:`saveBrandHit(${j}, '${lbl}')` })).join('') || '<div class="cat-empty">None found in the open map data within 150 miles.</div>'}
+    ${results.length > 4 ? `<div hidden>${results.slice(4).map((r, j)=> shopCard({ ...r, starJs:`saveBrandHit(${j + 4}, '${lbl}')` })).join('')}</div><button class="shop-more" onclick="this.previousElementSibling.hidden=false; this.remove();">Show ${results.length - 4} more</button>` : ''}
+    <a class="shop-more" style="text-align:center; text-decoration:none;" href="https://www.google.com/maps/search/${encodeURIComponent(b.term)}/${near}" target="_blank" rel="noopener">Not listed? Check Google Maps ›</a></div>`;
+}
+// The old search asked one server to scan every named place within 150 miles,
+// which timed out for most brands. Now: small searches that only look at
+// shops, crafts and offices, widened 40 > 90 > 150 mi, plus the free Photon
+// place search at the same time, so one busy server doesn't fail the button.
+async function brandFind(b, loc, onStep){
+  const re = b.re.replace(/"/g, ''), rx = new RegExp(b.re, 'i');
+  const keep = new Map();
+  const add = r=>{ const k = r.name.toLowerCase() + r.lat.toFixed(3); if(!keep.has(k)) keep.set(k, r); };
+  const fromTags = t=>({ address:[t['addr:housenumber'], t['addr:street'], t['addr:city']].filter(Boolean).join(' '), phone: t.phone || t['contact:phone'] || '', web: t.website || t['contact:website'] || '' });
+  const photon = Promise.all((b.words || [b.label]).map(w=>
+    fetchJSON(`https://photon.komoot.io/api?q=${encodeURIComponent(w)}&lat=${loc.lat}&lon=${loc.lng}&limit=25&lang=en`, {}, 12000).catch(()=>null)
+  )).then(all=>{
+    for(const d of all){ for(const f of (d && d.features) || []){
+      const p = f.properties || {}, [lo, la] = (f.geometry || {}).coordinates || [];
+      if(!p.name || la == null || !rx.test(p.name)) continue;
+      if(/^(highway|place|boundary|natural|waterway|railway|leisure|landuse)$/.test(p.osm_key || '') || p.osm_value === 'school') continue;
+      if(distMiles(loc.lat, loc.lng, la, lo) > 150) continue;
+      add({ name:p.name, catKey:'brand', address:[p.housenumber, p.street, p.city].filter(Boolean).join(' '), phone:'', web:'', lat:la, lng:lo });
+    } }
+  });
+  let overpassOk = false;
+  for(const mi of [40, 90, 150]){
+    if(onStep) onStep(mi);
+    const R = Math.round(mi * 1609), A = `(around:${R},${loc.lat},${loc.lng})`;
+    const parts = ['shop','craft','office','amenity'].map(k=>`nwr["${k}"]["name"~"${re}",i]${A};`).join('') + `nwr["brand"~"${re}",i]${A};`
+      + (b.tags || []).map(([k, v])=>`nwr["${k}"="${v}"]${A};`).join('');
+    try{
+      const d = await overpass(`[out:json][timeout:25];(${parts});out center tags 150;`, 30000);
+      overpassOk = true;
+      for(const el of d.elements || []){
+        const la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon), t = el.tags || {};
+        if(!la || !t.name) continue;
+        if(t.highway || t.amenity === 'school' || t.leisure || t.natural || t.place) continue;
+        add({ name:t.name, catKey:'brand', ...fromTags(t), lat:la, lng:lo });
+      }
+    }catch(e){}
+    if(keep.size >= 4) break;
+  }
+  await photon;
+  if(!keep.size && !overpassOk) throw new Error('servers busy');
+  return [...keep.values()];
+}
+// Where searches should center: a real fix or a spot set by hand, else the
+// working town. A no-GPS tablet's miles-off guess is never used.
+function workLoc(){
+  if(userLoc && !userLoc.approx && (userLoc.manual || (userLoc.acc && userLoc.acc <= 1500))) return userLoc;
+  const a = currentArea();
+  return a ? { lat: a.lat, lng: a.lng } : (userLoc || null);
 }
 let brandHits = [];
 async function saveBrandHit(j, label){
@@ -4123,7 +4184,7 @@ function openSalesMap(){
     salesBase.sat = L.layerGroup([L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagery &copy; Esri' }), L.tileLayer(esri + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 })]);
     salesLayers = L.layerGroup().addTo(salesMap);
     drawCityOutlines(salesMap);
-    salesMap.on('click', e=>{ if(terrDraft) addTerrPoint(e.latlng.lat, e.latlng.lng); });
+    salesDrawEvents();
   }
   setTimeout(()=>salesMap.invalidateSize(), 60);
   drawTerritories(); renderTerritories();
@@ -4134,24 +4195,66 @@ document.getElementById('terrSatBtn').addEventListener('click', ()=>{
   salesMap.removeLayer(salesSat ? salesBase.streets : salesBase.sat); (salesSat ? salesBase.sat : salesBase.streets).addTo(salesMap);
   document.getElementById('terrSatBtn').textContent = salesSat ? '🗺️ Streets' : '🛰️ Satellite';
 });
+// Drawing works with a finger: drag to trace the area, or tap corner by
+// corner. While drawing, the map stops panning so the finger draws instead
+// (zoom with the + / - buttons).
+let terrUndo = []; // draft length before each tap or stroke, so Undo removes a whole stroke
+function salesDrawEvents(){
+  const el = salesMap.getContainer();
+  let stroke = null, moved = false;
+  const ll = ev=> salesMap.mouseEventToLatLng(ev);
+  el.addEventListener('pointerdown', ev=>{
+    if(!terrDraft || ev.target.closest('.leaflet-control')) return;
+    ev.preventDefault(); try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+    stroke = [ll(ev)]; moved = false;
+  });
+  el.addEventListener('pointermove', ev=>{
+    if(!terrDraft || !stroke) return;
+    const p = ll(ev), last = stroke[stroke.length - 1];
+    const px = salesMap.latLngToContainerPoint(p).distanceTo(salesMap.latLngToContainerPoint(last));
+    if(px < 8) return;
+    moved = true; stroke.push(p);
+    if(terrDraftLayer) salesMap.removeLayer(terrDraftLayer);
+    terrDraftLayer = L.polyline(terrDraft.concat(stroke.map(q=>[q.lat, q.lng])), { color:'#ffd166', weight:4, interactive:false }).addTo(salesMap);
+  });
+  const end = ev=>{
+    if(!terrDraft || !stroke) return;
+    const pts = stroke; stroke = null;
+    terrUndo.push(terrDraft.length);
+    if(!moved){ addTerrPoint(pts[0].lat, pts[0].lng); return; }
+    // keep at most ~60 corners so the saved shape stays small
+    const step = Math.max(1, Math.ceil(pts.length / 60));
+    const keep = pts.filter((_, i)=> i % step === 0 || i === pts.length - 1);
+    const before = terrDraft.slice(); terrDraft = [];
+    if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; }
+    before.concat(keep.map(q=>[q.lat, q.lng])).forEach(([a, b])=> addTerrPoint(a, b));
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
 function terrDrawUi(on){
+  if(salesMap){
+    const el = salesMap.getContainer();
+    if(on){ salesMap.dragging.disable(); salesMap.touchZoom.disable(); salesMap.doubleClickZoom.disable(); el.style.touchAction = 'none'; el.classList.add('drawing'); }
+    else{ salesMap.dragging.enable(); salesMap.touchZoom.enable(); salesMap.doubleClickZoom.enable(); el.style.touchAction = ''; el.classList.remove('drawing'); }
+  }
   document.getElementById('terrDrawBtn').hidden = on;
   ['terrUndoBtn','terrFinishBtn','terrCancelBtn'].forEach(id=> document.getElementById(id).hidden = !on);
 }
 function addTerrPoint(lat, lng){
   terrDraft.push([lat, lng]);
   if(terrDraftLayer) salesMap.removeLayer(terrDraftLayer);
-  terrDraftLayer = (terrDraft.length > 2 ? L.polygon(terrDraft, { color:'#ffd166', weight:3, dashArray:'4 4', fillOpacity:.15 }) : L.polyline(terrDraft, { color:'#ffd166', weight:3 })).addTo(salesMap);
-  setStatus('terrStatus', `${terrDraft.length} corner${terrDraft.length > 1 ? 's' : ''}. ${terrDraft.length < 3 ? 'Need at least 3.' : 'Tap Finish when it covers the area.'}`);
+  terrDraftLayer = (terrDraft.length > 2 ? L.polygon(terrDraft, { color:'#ffd166', weight:3, dashArray:'4 4', fillOpacity:.15, interactive:false }) : L.polyline(terrDraft, { color:'#ffd166', weight:3, interactive:false })).addTo(salesMap);
+  setStatus('terrStatus', terrDraft.length < 3 ? 'Keep going: drag your finger around the area, or tap more corners.' : 'Tap Finish when it covers the area, or Undo to back up.');
 }
 function cancelTerrDraft(){ terrDraft = null; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } terrDrawUi(false); setStatus('terrStatus', ''); }
 document.getElementById('terrDrawBtn').addEventListener('click', ()=>{
   if(!salesMap) openSalesMap(); if(!salesMap) return;
-  terrDraft = []; terrDrawUi(true); document.getElementById('terrForm').hidden = true;
-  setStatus('terrStatus', 'Tap the corners of the territory on the map.');
+  terrDraft = []; terrUndo = []; terrDrawUi(true); document.getElementById('terrForm').hidden = true;
+  setStatus('terrStatus', 'Drag your finger around the area on the map, or tap its corners. Use + / − to zoom.');
   document.getElementById('salesMap').scrollIntoView({ behavior:'smooth', block:'center' });
 });
-document.getElementById('terrUndoBtn').addEventListener('click', ()=>{ if(!terrDraft || !terrDraft.length) return; const p = terrDraft.slice(0, -1); terrDraft = []; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } p.forEach(([a,b])=>addTerrPoint(a, b)); });
+document.getElementById('terrUndoBtn').addEventListener('click', ()=>{ if(!terrDraft || !terrDraft.length) return; const p = terrDraft.slice(0, terrUndo.length ? terrUndo.pop() : terrDraft.length - 1); terrDraft = []; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } p.forEach(([a,b])=>addTerrPoint(a, b)); if(!p.length) setStatus('terrStatus', 'Drag your finger around the area on the map, or tap its corners.'); });
 document.getElementById('terrCancelBtn').addEventListener('click', cancelTerrDraft);
 function fillRepNames(){
   const names = new Set(territories.map(t=>t.rep).concat(roster.map(r=>r.name)).filter(Boolean));
@@ -4214,7 +4317,7 @@ function drawTerritories(){
     const col = t.color || repColor(t.rep);
     L.polygon(t.points, { color: col, weight:3, fillColor: col, fillOpacity:.22 })
       .bindTooltip(`${escapeHtml(t.rep || 'Unassigned')}: ${escapeHtml(t.name)}`, { permanent:true, direction:'center', className:'terr-lbl' })
-      .on('click', e=>{ if(terrDraft){ addTerrPoint(e.latlng.lat, e.latlng.lng); return; } openTerrForm(t); })
+      .on('click', e=>{ if(terrDraft) return; openTerrForm(t); })
       .addTo(salesLayers);
   });
   leads.filter(l=>l.lat != null && inActiveCity(l.lat, l.lng)).forEach(l=>{
@@ -4831,7 +4934,7 @@ async function arriveAt(lat, lng, label, fix = {}){
   }
   Object.assign(area, place, { lat, lng, fix: { lat, lng, acc: fix.acc || null, src: fix.src || 'gps', time: Date.now() } });
   currentAreaId = area.id;
-  userLoc = { lat, lng, acc: fix.acc };
+  userLoc = { lat, lng, acc: fix.acc, manual: fix.src === 'map' || fix.src === 'typed' };
   await saveAreas();
   announceArea(area);
   if(navigator.onLine) await refreshArea(area, { force:true });
