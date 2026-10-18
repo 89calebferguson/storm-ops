@@ -590,6 +590,11 @@
     </div>
     <input type="file" id="importInput" accept="application/json,.json" style="display:none;">
     <div class="status-line" id="dataStatus"></div>
+    <div class="install-box" id="autoSaveBox">
+      <div class="card-name" style="margin-bottom:4px;">Auto Save</div>
+      <div class="card-sub wrap" id="autoSaveLine">Saves everything every 15 seconds, including anything you're still typing.</div>
+      <details style="margin-top:6px;"><summary class="card-sub" style="cursor:pointer;">Save copies (go back to an earlier point)</summary><div id="snapList"></div></details>
+    </div>
     <div class="install-box" id="installBox">
       <div class="card-name" style="margin-bottom:4px;">Put Storm Ops on your home screen</div>
       <div class="card-sub" style="white-space:normal;" id="installText">iPhone: tap Share, then "Add to Home Screen". Android: tap the ⋮ menu, then "Install app". Once installed it opens with no signal.</div>
@@ -643,7 +648,10 @@
     <button class="locate-btn" id="ownerHereBtn" style="font-size:17px; padding:16px;">🏠 Look Up Where I'm Standing</button>
     <div class="field" style="margin:8px 0;"><input type="text" id="ownerAddrInput" placeholder="Or type an address (e.g. 120 N Lafayette St, Macomb, IL)"></div>
     <button class="locate-btn secondary" id="ownerAddrBtn" style="margin-bottom:8px;">Look Up This Address</button>
-    <div class="status-line" id="ownerStatus">You can also tap any lot on the Map tab.</div>
+    <div class="status-line" id="ownerStatus">Or tap a house on the map below.</div>
+    <p class="section-label" style="margin-top:12px;">Tap a House</p>
+    <div class="mini-map" id="ownerPickMap" style="height:340px;"></div>
+    <p class="mini-cap" id="ownerPickCap">Zoom in and tap the house you want. The owner shows up below.</p>
     <div id="ownerResult"></div>
     <div id="gmapBox"></div>
 
@@ -1297,6 +1305,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'here') renderCities();
+    if(btn.dataset.tab === 'owner') initOwnerPick();
     if(btn.dataset.tab === 'here' && miniMaps.hereMiniMap) setTimeout(()=>miniMaps.hereMiniMap.invalidateSize(), 50);
     if(btn.dataset.tab === 'affected') openAffected();
     if(btn.dataset.tab === 'debris') openDebris();
@@ -1401,6 +1410,9 @@ function getLocation(statusEl, onDone, opts = {}){
     onDone();
   };
   const timer = setTimeout(finish, opts.precise ? 20000 : 12000);
+  // A device with no GPS (Wi-Fi tablet) never gets better than miles, so
+  // don't make the user wait the full time to find that out.
+  setTimeout(()=>{ if(!done && best && best.coords.accuracy > 1500) finish(); }, 5000);
   wid = navigator.geolocation.watchPosition(pos=>{
     if(!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
     statusEl.textContent = `Getting a GPS fix… (within ${Math.round(best.coords.accuracy * 3.28).toLocaleString()} ft so far)`;
@@ -2852,7 +2864,7 @@ function miniMap(elId, lat, lng, rings, opts = {}){
   const el = document.getElementById(elId);
   if(!el || typeof L === 'undefined'){ if(el) el.innerHTML = '<div class="cat-empty">Map needs signal the first time.</div>'; return; }
   dropMiniMap(elId);
-  const m = L.map(el, { zoomControl:true, attributionControl:false, scrollWheelZoom:false, zoomAnimation:false, fadeAnimation:false, markerZoomAnimation:false }).setView([lat, lng], 19);
+  const m = L.map(el, { zoomControl:true, attributionControl:false, scrollWheelZoom:false, zoomAnimation:false, fadeAnimation:false, markerZoomAnimation:false }).setView([lat, lng], opts.zoom || 19);
   const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
   if(opts.streets) L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(m);
   else{
@@ -2870,7 +2882,7 @@ function miniMap(elId, lat, lng, rings, opts = {}){
   if(!opts.noDot) L.circleMarker([lat, lng], { radius:8, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1, interactive:false }).addTo(m);
   if(opts.onTap) m.on('click', e=> opts.onTap(e.latlng.lat, e.latlng.lng));
   miniMaps[elId] = m;
-  if(elId === 'hereMiniMap') drawCityOutlines(m);
+  if(elId === 'hereMiniMap' || elId === 'ownerPickMap') drawCityOutlines(m);
   setTimeout(()=>{ if(miniMaps[elId] === m) m.invalidateSize(); }, 60);
 }
 function ringsNear(rings, lat, lng){
@@ -4761,24 +4773,19 @@ async function refreshArea(area, opts = {}){
   refreshing = true; renderWhere();
   const name = area.town || 'this area';
   try{
-    setStatus('hereStatus', `Updating ${name}: local offices…`);
-    await updateOffices(area);
-    await saveAreas(); renderHere(); renderContacts();
-    setStatus('hereStatus', `Updating ${name}: town officials…`);
-    try{ await updateTown(area); }catch(e){}
-    await saveAreas(); renderHere(); renderContacts();
-
-    setStatus('hereStatus', `Updating ${name}: weather…`);
-    try{ const wx = await loadWeather(area.lat, area.lng); if(wx) area.weather = wx; }catch(e){}
-    if(area.county && (!area.countyInfo || Date.now() - (area.countyInfoTime || 0) > 30*86400000)){
-      const ci = await loadCountyInfo(area.county, area.state);
-      if(ci){ area.countyInfo = ci; area.countyInfoTime = Date.now(); }
-    }
-    await saveAreas(); renderHere();
-
-    setStatus('hereStatus', `Updating ${name}: electric utility…`);
-    try{ const u = await findUtility(area.lat, area.lng); if(u.length){ area.utility = u; area.utilityTime = Date.now(); } }catch(e){}
-    await saveAreas(); renderHere();
+    setStatus('hereStatus', `Updating ${name}: offices, town officials, weather, utility…`);
+    // These don't depend on each other, so run them together and show each
+    // one as soon as it lands instead of waiting in line.
+    const show = async ()=>{ await saveAreas(); renderHere(); renderContacts(); };
+    await Promise.all([
+      updateOffices(area).catch(()=>{}).then(show),
+      updateTown(area).catch(()=>{}).then(show),
+      loadWeather(area.lat, area.lng).then(wx=>{ if(wx) area.weather = wx; }).catch(()=>{}).then(show),
+      (area.county && (!area.countyInfo || Date.now() - (area.countyInfoTime || 0) > 30*86400000)
+        ? loadCountyInfo(area.county, area.state).then(ci=>{ if(ci){ area.countyInfo = ci; area.countyInfoTime = Date.now(); } }).catch(()=>{}).then(show)
+        : Promise.resolve()),
+      findUtility(area.lat, area.lng).then(u=>{ if(u.length){ area.utility = u; area.utilityTime = Date.now(); } }).catch(()=>{}).then(show)
+    ]);
 
     if(area.county){
       setStatus('hereStatus', `Updating ${name}: ${area.county} County property records…`);
@@ -4818,9 +4825,11 @@ function announceArea(a){
   if(salesMap) salesMap.setView([a.lat, a.lng], 15);
   if(affMap){ affMap._fitted = false; }
   affData = null; debrisData = null;
+  ownerPickFor = null;
   const active = document.querySelector('.tab.active');
   if(active && active.dataset.tab === 'affected') openAffected();
   if(active && active.dataset.tab === 'debris') openDebris();
+  if(active && active.dataset.tab === 'owner') initOwnerPick(true);
   const os = document.getElementById('ownerStatus');
   if(os && !lastOwnerResult) os.textContent = `Working in ${bareTown(a.town)}. Tap Look Up Where I'm Standing, or any lot on the Map tab.`;
 }
@@ -5127,6 +5136,26 @@ function parcelProblem(r){
 }
 function gisSearchUrl(county, state){ return `https://www.google.com/search?q=${encodeURIComponent((county ? county + ' County ' : '') + (state || '') + ' GIS parcel map property owner search')}`; }
 function assessorSearchUrl(county, state){ return `https://www.google.com/search?q=${encodeURIComponent((county ? county + ' County ' : '') + (state || '') + ' assessor property search')}`; }
+
+// Always-on map on the Owner tab: tap a house to look it up. Centers on a good
+// GPS fix when there is one, else on the working town.
+let ownerPickFor = null, ownerPickPin = null;
+function initOwnerPick(force){
+  const a = currentArea(); if(!a) return;
+  const good = userLoc && userLoc.acc && userLoc.acc <= 100;
+  const key = a.id + (good ? ':' + userLoc.lat.toFixed(4) + userLoc.lng.toFixed(4) : '');
+  if(!force && ownerPickFor === key && miniMaps.ownerPickMap){ setTimeout(()=>miniMaps.ownerPickMap.invalidateSize(), 50); return; }
+  ownerPickFor = key; ownerPickPin = null;
+  const lat = good ? userLoc.lat : a.lat, lng = good ? userLoc.lng : a.lng;
+  miniMap('ownerPickMap', lat, lng, null, { zoom: good ? 19 : 16, acc: good ? userLoc.acc : 0, noDot: !good, onTap: (la, lo)=>{
+    const m = miniMaps.ownerPickMap; if(!m) return;
+    if(ownerPickPin) ownerPickPin.setLatLng([la, lo]); else ownerPickPin = L.marker([la, lo], { icon: L.divIcon({ className:'', html:'<div style="font-size:30px;line-height:30px;transform:translate(-4px,-26px)">📌</div>' }) }).addTo(m);
+    const cap = document.getElementById('ownerPickCap'); if(cap) cap.textContent = 'Looking up the pinned house… Tap another house to switch.';
+    runOwnerLookup(la, lo).then(()=>{ const r = document.getElementById('ownerResult'); if(r) r.scrollIntoView({ behavior:'smooth', block:'start' }); });
+  } });
+  const cap = document.getElementById('ownerPickCap');
+  if(cap) cap.textContent = good ? 'Blue dot is you. Tap the house you want; the owner shows up below.' : `Showing ${bareTown(a.town)}. Zoom in and tap the house you want; the owner shows up below.`;
+}
 
 async function runOwnerLookup(lat, lng, acc){
   setStatus('ownerStatus', 'Checking county property records…');
@@ -5543,6 +5572,83 @@ function attachTownAutocomplete(inputId, listId, onPick){
 attachTownAutocomplete('hereTownInput', 'acListHere', pick=> arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }));
 attachTownAutocomplete('contactsTownInput', 'acListContacts', pick=>{ setStatus('hereStatus', 'Loading ' + pick.name + '…'); toast('Loading ' + pick.name + '. Contacts fill in as they arrive.'); arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }); });
 
+// ---------- auto save ----------
+// Every 15 s: write every list to storage, plus whatever is half-typed in a
+// box, so a crash or a dead battery loses nothing. Each save also keeps a
+// copy of the work data so you can go back to an earlier point. Copies older
+// than 1 minute go to a recycle bin; bin copies are erased after 30 minutes.
+// Only these save copies are ever deleted, never the real jobs, leads,
+// flags or photos. The newest copy is always kept.
+const AUTOSAVE_MS = 15000, SNAP_BIN_MS = 60000, SNAP_PURGE_MS = 30*60000;
+const SNAP_KEYS = ['vendors','leads','needs','officials','jobs','hazards','roster','notes','icsLog','ics213','properties','marks','zones','territories','cities','activeCity','checklistItems','customCounties','drafts'];
+let lastAutoSave = 0, lastSnapSig = '', autoSaving = false;
+function collectDrafts(){
+  const d = {};
+  document.querySelectorAll('input[id], textarea[id]').forEach(el=>{
+    if(el.type === 'file' || el.type === 'checkbox' || el.type === 'radio' || el.type === 'hidden') return;
+    if(el.value && el.value.length < 5000) d[el.id] = el.value;
+  });
+  return d;
+}
+async function restoreDrafts(){
+  const d = await getJSON('drafts', {});
+  for(const [id, v] of Object.entries(d || {})){
+    const el = document.getElementById(id);
+    if(el && !el.value && el.tagName === 'TEXTAREA') el.value = v; // only notes-style boxes; search boxes start clean
+  }
+}
+async function autoSave(){
+  if(!dataLoaded || autoSaving) return;
+  autoSaving = true;
+  try{
+    await Promise.all([saveVendors(), saveLeads(), saveNeeds(), saveOfficials(), saveJobs(), saveHazards(), saveRoster(), saveNotes(), saveIcsLog(),
+      setJSON('ics213', ics213), saveProperties(), saveMarks(), saveZones(), saveTerritories(), saveAreas(), saveCities(), saveChecklist(), setJSON('drafts', collectDrafts())]);
+    const data = {};
+    for(const k of SNAP_KEYS){ try{ data[k] = (await store.get(k)).value; }catch(e){} }
+    const sig = JSON.stringify(data);
+    let snaps = await getJSON('snaps', []);
+    const now = Date.now();
+    if(sig !== lastSnapSig){
+      // a new copy only when something changed, so an idle app doesn't churn
+      await store.set('snap:' + now, sig);
+      snaps.push({ t: now, size: sig.length });
+      lastSnapSig = sig;
+    }
+    const newest = snaps.length ? snaps[snaps.length - 1].t : 0;
+    const keep = [];
+    for(const sn of snaps){
+      if(sn.t !== newest && now - sn.t > SNAP_PURGE_MS){ try{ await store.delete('snap:' + sn.t); }catch(e){} continue; }
+      sn.bin = sn.t !== newest && now - sn.t > SNAP_BIN_MS;
+      keep.push(sn);
+    }
+    await setJSON('snaps', keep);
+    lastAutoSave = now;
+    renderAutoSave(keep);
+  }catch(e){}
+  finally{ autoSaving = false; }
+}
+function renderAutoSave(snaps){
+  const line = document.getElementById('autoSaveLine');
+  if(line) line.textContent = `Saves everything every 15 seconds, including anything you're still typing. Last saved ${lastAutoSave ? new Date(lastAutoSave).toLocaleTimeString([], { hour:'numeric', minute:'2-digit', second:'2-digit' }) : 'not yet'}.`;
+  const el = document.getElementById('snapList'); if(!el || !snaps) return;
+  const row = sn=>`<div class="card-sub" style="display:flex;justify-content:space-between;align-items:center;margin:4px 0;">${new Date(sn.t).toLocaleTimeString([], { hour:'numeric', minute:'2-digit', second:'2-digit' })}${sn.bin ? ' · recycle bin' : ''}<button class="small-btn" onclick="restoreSnap(${sn.t}, this)">Go back to this</button></div>`;
+  const live = snaps.filter(x=>!x.bin).reverse(), bin = snaps.filter(x=>x.bin).reverse();
+  el.innerHTML = (live.map(row).join('') || '') + (bin.length ? `<p class="card-sub" style="margin:8px 0 2px;">Recycle bin (erased 30 min after saving)</p>` + bin.map(row).join('') : '') || '<div class="card-sub">No copies yet.</div>';
+}
+async function restoreSnap(t, btn){
+  if(btn && !btn.dataset.armed){ btn.dataset.armed = '1'; btn.textContent = 'Tap again to go back'; setTimeout(()=>{ if(btn){ delete btn.dataset.armed; btn.textContent = 'Go back to this'; } }, 4000); return; }
+  let raw; try{ raw = (await store.get('snap:' + t)).value; }catch(e){ toast('That copy is gone.'); return; }
+  lastSnapSig = ''; await autoSave(); // keep a copy of right now, so going back can be undone
+  const data = JSON.parse(raw);
+  for(const [k, v] of Object.entries(data)){ if(SNAP_KEYS.includes(k) && v != null) await store.set(k, v); }
+  await loadAll(); await restoreDrafts();
+  lastSnapSig = ''; await autoSave();
+  toast('Went back to ' + new Date(t).toLocaleTimeString() + '. The copy from just before is in the list if you need it.');
+}
+setInterval(autoSave, AUTOSAVE_MS);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden') autoSave(); });
+window.addEventListener('pagehide', ()=> autoSave());
+
 // ---------- backup / restore ----------
 document.getElementById('exportBtn').addEventListener('click', async ()=>{
   const keys = await store.keys();
@@ -5653,6 +5759,8 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && dataL
 (async function boot(){
   await migrateLocalStorage();
   await loadAll();
+  await restoreDrafts();
+  setTimeout(autoSave, 3000);
   const a = currentArea();
   if(a){
     const meta = await getJSON('parcelsMeta:' + a.id, null);
