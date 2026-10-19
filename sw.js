@@ -1,6 +1,6 @@
 // Storm Ops service worker: keeps the app itself, the map library, fonts and
 // every map/satellite tile you've looked at available with no signal.
-const VERSION = 'stormops-v3.9.0';
+const VERSION = 'stormops-v3.10.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',

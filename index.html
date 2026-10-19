@@ -2466,7 +2466,7 @@ function renderLiveResults(){
 // differently; we auto-detect them from what the layer actually returns.
 // Endpoints below were verified against public county GIS directories.
 const COUNTY_PARCELS = {
-  'cook|illinois':      { url:'https://gis12.cookcountyil.gov/traditional/rest/services/CookViewer3Parcels/MapServer/0', note:'PIN + address only — Cook does not publish owner names publicly' },
+  'cook|illinois':      { url:'https://gis12.cookcountyil.gov/traditional/rest/services/CookViewer3Parcels/MapServer/0', note:'PIN + address from the map; owner pulled from the Assessor records site' },
   'dupage|illinois':    { url:'https://gis.dupageco.org/arcgis/rest/services/DuPage_County_IL/ParcelsWithRealEstateCC/MapServer/0' },
   'kane|illinois':      { url:'https://gistech.countyofkane.org/arcgis/rest/services/KanePINList/MapServer/0' },
   'dekalb|illinois':    { url:'https://services7.arcgis.com/hEXJrPwm89CLXBYe/arcgis/rest/services/DeKalbIL_Parcels/FeatureServer/0' },
@@ -2498,6 +2498,62 @@ function matchField(attrs, kind){
 }
 
 let customCounties = {};
+
+// Some counties keep owner names out of the map but publish them in a
+// separate free records site. These pull the owner from that site
+// automatically when the map layer comes back without a name.
+// Cook IL: Assessor open data (Socrata, no key). Point -> PIN from the
+// parcel centroid table, then PIN -> taxpayer / owner of record.
+const OWNER_PLACEHOLDER = /^(exempt|taxpayer of|current owner|unknown|owner|occupant|resident|n\/a|none)\b/i;
+const COUNTY_OWNER_SOURCES = {
+  'cook|illinois': async (lat, lng, p)=>{
+    const SOC = 'https://datacatalog.cookcountyil.gov/resource/';
+    let pin = p && p.parcel ? String(p.parcel.value).replace(/\D/g, '') : '';
+    if(pin && pin.length < 14) pin = pin.padEnd(14, '0');
+    if(pin.length !== 14){
+      pin = '';
+      for(const d of [0.0004, 0.0012]){
+        const w = `lat between ${(lat - d).toFixed(6)} and ${(lat + d).toFixed(6)} and lon between ${(lng - d * 1.33).toFixed(6)} and ${(lng + d * 1.33).toFixed(6)}`;
+        const rows = await fetchJSON(`${SOC}nj4t-kc8j.json?$select=pin,lat,lon,year&$where=${encodeURIComponent(w)}&$order=year%20DESC&$limit=200`, {}, 15000);
+        if(!rows || !rows.length) continue;
+        const top = Math.max(...rows.map(r=>+r.year || 0));
+        const best = rows.filter(r=>(+r.year || 0) === top).map(r=>({ pin:r.pin, d: Math.hypot(+r.lat - lat, (+r.lon - lng) * 0.75) })).sort((a,b)=>a.d-b.d)[0];
+        if(best){ pin = best.pin; break; }
+      }
+    }
+    if(!pin) return null;
+    const rows = await fetchJSON(`${SOC}3723-97qp.json?pin=${pin}&$order=year%20DESC&$limit=4`, {}, 15000);
+    const ok = v=> v && !OWNER_PLACEHOLDER.test(String(v).trim());
+    for(const r of rows || []){
+      const owner = ok(r.owner_address_name) ? r.owner_address_name : ok(r.mail_address_name) ? r.mail_address_name : '';
+      if(!owner) continue;
+      const mail = [r.mail_address_full, r.mail_address_city_name, [r.mail_address_state, r.mail_address_zipcode_1].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      const pinFmt = pin.replace(/^(\d{2})(\d{2})(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3-$4-$5');
+      return { owner, mail, pin: pinFmt, address: r.prop_address_full ? [r.prop_address_full, r.prop_address_city_name].filter(Boolean).join(', ') : '', year: r.year,
+        src: `Cook County Assessor records (${r.year} tax year)` };
+    }
+    return { pin, none:true };
+  }
+};
+function ownerSourceFor(county, state){
+  const c = (county||'').toLowerCase().replace(/\s*county\s*/,'').trim(), s2 = (state||'').toLowerCase().trim();
+  return COUNTY_OWNER_SOURCES[c + '|' + s2] || null;
+}
+async function fillOwnerFromRecords(lat, lng, county, state, p){
+  const fn = ownerSourceFor(county, state);
+  if(!fn || !navigator.onLine) return p;
+  try{
+    const o = await fn(lat, lng, p && p.status === 'ok' ? p : null);
+    if(!o || o.none) return p;
+    const q = p && p.status === 'ok' ? p : { status:'ok', county, state };
+    q.owner = { value: o.owner };
+    if(o.mail && !q.mail) q.mail = { value: o.mail };
+    if(o.pin && !q.parcel) q.parcel = { value: o.pin };
+    if(o.address && !q.address) q.address = { value: o.address };
+    q.ownerSrc = o.src;
+    return q;
+  }catch(e){ return p; }
+}
 
 function parcelSourceFor(county, state){
   const c = (county||'').toLowerCase().replace(/\s*county\s*/,'').trim();
@@ -3090,7 +3146,8 @@ async function onMapClick(e){
   if(rows.length){
     body = rows.map(([k,v])=>`<div style="font-size:12px;"><b>${k}:</b> ${escapeHtml(String(v))}</div>`).join('');
     if(r.p.offline) body += `<div style="font-size:10.5px; color:var(--text-dim); margin-top:4px;">From records saved on this phone ${timeAgo(r.p.time)}.</div>`;
-    if(!r.p.owner) body += `<div style="font-size:10.5px; color:var(--danger); margin-top:4px;">This county does not publish owner names in its map data. Use the county GIS site below.</div>`;
+    if(r.p.ownerSrc) body += `<div style="font-size:10.5px; color:var(--text-dim); margin-top:4px;">Owner from ${escapeHtml(r.p.ownerSrc)}.</div>`;
+    if(!r.p.owner) body += `<div style="font-size:10.5px; color:var(--danger); margin-top:4px;">${ownerSourceFor(r.county, r.state) ? 'The county records site had no owner name for this lot (it may be exempt or recently sold).' : 'This county keeps owner names off its map, and the app can\'t read its records site automatically yet. Tell Claude the county and it can be added.'}</div>`;
   }else{
     body = `<div style="font-size:11px;">${escapeHtml(parcelProblem(r))}</div>`;
   }
@@ -3868,7 +3925,7 @@ async function updateTown(area){
     if(r.ok){ area.townPack = await r.json(); area.townPackTime = Date.now(); }
     else if(r.status === 404){ area.townPack = null; }
   }catch(e){}
-  if(area.townInfo && Date.now() - (area.townInfoTime || 0) < 7*86400000) return;
+  // re-pulled every time the app opens (Caleb wants it fresh); a failed pull keeps the last copy
   const info = await loadTownInfo(bareTown(area.town), area.lat, area.lng);
   if(info){ area.townInfo = info; area.townInfoTime = Date.now(); }
 }
@@ -3933,7 +3990,7 @@ function townSectionHtml(a){
     ${mine.length ? mine.map(c=>contactRow(c, { noDelete:true, edit:true })).join('') : ''}
     ${rows}${links}
     <button class="small-btn" style="display:block; width:100%; margin-top:6px;" onclick="addTownContact()">+ Add a ${escapeHtml(town)} contact</button>
-    <div class="fresh" style="margin-top:6px;">${pack ? 'Checked list' : 'Open map + Wikidata'}${a.townInfoTime ? ' · updated ' + timeAgo(a.townInfoTime) : ''}</div></div>`;
+    <div class="fresh" style="margin-top:6px;">${pack ? 'Checked list' : 'Open map + Wikidata'}${(pack ? a.townPackTime : a.townInfoTime) ? ' · updated ' + timeAgo(pack ? a.townPackTime : a.townInfoTime) : ''}</div></div>`;
 }
 function addTownContact(){
   document.querySelector('.tab[data-tab="contacts"]').click();
@@ -4953,14 +5010,15 @@ async function switchArea(id){
   if(navigator.onLine) refreshArea(a);
 }
 
-let refreshing = false;
+let refreshing = false, refreshStarted = 0;
 let pendingRefresh = null;
 async function refreshArea(area, opts = {}){
   if(!area || !navigator.onLine) return;
   // a refresh for a different area waits its turn instead of being dropped
-  if(refreshing){ pendingRefresh = { area, opts }; return; }
+  // a refresh stuck on a dead connection must not block every later one
+  if(refreshing && Date.now() - refreshStarted < 120000){ pendingRefresh = { area, opts }; return; }
   if(!opts.force && area.refreshed && Date.now() - area.refreshed < AREA_REFRESH_MIN*60000 && (area.offices || []).length) return;
-  refreshing = true; renderWhere();
+  refreshing = true; refreshStarted = Date.now(); renderWhere();
   const name = area.town || 'this area';
   try{
     setStatus('hereStatus', `Updating ${name}: offices, town officials, weather, utility…`);
@@ -4971,16 +5029,17 @@ async function refreshArea(area, opts = {}){
       updateOffices(area).catch(()=>{}).then(show),
       updateTown(area).catch(()=>{}).then(show),
       loadWeather(area.lat, area.lng).then(wx=>{ if(wx) area.weather = wx; }).catch(()=>{}).then(show),
-      (area.county && (!area.countyInfo || Date.now() - (area.countyInfoTime || 0) > 30*86400000)
+      (area.county
         ? loadCountyInfo(area.county, area.state).then(ci=>{ if(ci){ area.countyInfo = ci; area.countyInfoTime = Date.now(); } }).catch(()=>{}).then(show)
         : Promise.resolve()),
       findUtility(area.lat, area.lng).then(u=>{ if(u.length){ area.utility = u; area.utilityTime = Date.now(); } }).catch(()=>{}).then(show)
     ]);
+    area.refreshed = Date.now(); await show();
 
     if(area.county){
       setStatus('hereStatus', `Updating ${name}: ${area.county} County property records…`);
       try{
-        const src = await ensureParcelSource(area.county, area.state, area.lat, area.lng);
+        const src = await withTimeout(ensureParcelSource(area.county, area.state, area.lat, area.lng), 45000);
         area.parcelSrc = src ? { url: src.url, note: src.note || '' } : null;
       }catch(e){}
       const ds = await getJSON('parcelsMeta:' + area.id, null);
@@ -4993,7 +5052,7 @@ async function refreshArea(area, opts = {}){
 
     setStatus('hereStatus', `Updating ${name}: shops and services…`);
     userLoc = userLoc || { lat: area.lat, lng: area.lng };
-    await findEverything({ force:true });
+    try{ await withTimeout(findEverything({ force:true }), 90000); }catch(e){}
     area.shopsCount = liveResults.length;
     area.refreshed = Date.now();
     await saveAreas();
@@ -5303,6 +5362,7 @@ async function ownerLookupCore(lat, lng){
     const off = await lookupParcelOffline(lat, lng);
     if(off){ p = off; if(!county){ county = off.county; state = off.state; } }
   }
+  if(!(p && p.status === 'ok' && p.owner)) p = await fillOwnerFromRecords(lat, lng, county, state, p);
   const street = navigator.onLine ? await addressAt(lat, lng) : '';
   return { lat, lng, county, state, fullAddr, street, p: p || { status: navigator.onLine ? 'no_source' : 'offline_none' } };
 }
@@ -5374,6 +5434,7 @@ function renderOwnerResult(r){
       <div class="mini-map" id="ownerMiniMap"></div>
       <p class="mini-cap">${r.street ? 'Map address: ' + escapeHtml(r.street) + ' · ' : ''}Blue dot is the spot checked${r.acc ? ` (GPS within ${Math.round(r.acc * 3.28).toLocaleString()} ft${r.acc > 60 ? ', weak fix' : ''})` : ''}${ringsNear(r.p && r.p.rings, r.lat, r.lng) ? ', orange line is the lot' : ''}. <b>Wrong house? Tap the right one on this map.</b> <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${r.lat},${r.lng}" target="_blank" rel="noopener">Street View</a></p>
       ${rows.length ? `<dl class="kv">${rows.filter(([k])=>k!=='Owner').map(([k,v])=>`<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : `<p class="card-sub wrap" style="margin:0 0 10px;">${escapeHtml(parcelProblem(r))}</p>`}
+      ${r.p && r.p.ownerSrc ? `<p class="mini-cap">Owner from ${escapeHtml(r.p.ownerSrc)}. The tax bill name is usually the owner, but double-check before signing anything.</p>` : ''}
       <div class="btn-row">
         ${rows.length ? `<button class="small-btn go" onclick="saveLastOwner()">Save to Log</button><button class="small-btn" onclick="leadFromLastOwner()">Make a Lead</button><button class="small-btn" onclick="jobFromLastOwner()">Make a Job</button>` : ''}
         ${ownerSearch ? `<a class="small-btn" href="${ownerSearch}" target="_blank" rel="noopener">Search Owner's Phone</a>` : ''}
