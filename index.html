@@ -4253,8 +4253,8 @@ document.getElementById('terrSatBtn').addEventListener('click', ()=>{
   salesMap.removeLayer(salesSat ? salesBase.streets : salesBase.sat); (salesSat ? salesBase.sat : salesBase.streets).addTo(salesMap);
   document.getElementById('terrSatBtn').textContent = salesSat ? '🗺️ Streets' : '🛰️ Satellite';
 });
-// Drawing works with a finger: drag to trace the area, or tap corner by
-// corner. While drawing, the map stops panning so the finger draws instead
+// Drawing works with a finger: drag to draw a box, or tap corner by
+// corner for an odd shape. While drawing, the map stops panning so the finger draws instead
 // (zoom with the + / - buttons).
 let terrUndo = []; // draft length before each tap or stroke, so Undo removes a whole stroke
 function salesDrawEvents(){
@@ -4271,21 +4271,22 @@ function salesDrawEvents(){
     const p = ll(ev), last = stroke[stroke.length - 1];
     const px = salesMap.latLngToContainerPoint(p).distanceTo(salesMap.latLngToContainerPoint(last));
     if(px < 8) return;
-    moved = true; stroke.push(p);
+    moved = true; stroke[1] = p;
+    // drag = a straight-edged box from where the finger went down to where it is now
     if(terrDraftLayer) salesMap.removeLayer(terrDraftLayer);
-    terrDraftLayer = L.polyline(terrDraft.concat(stroke.map(q=>[q.lat, q.lng])), { color:'#ffd166', weight:4, interactive:false }).addTo(salesMap);
+    terrDraftLayer = L.rectangle(L.latLngBounds(stroke[0], p), { color:'#ffd166', weight:3, dashArray:'4 4', fillOpacity:.15, interactive:false }).addTo(salesMap);
   });
   const end = ev=>{
     if(!terrDraft || !stroke) return;
     const pts = stroke; stroke = null;
     terrUndo.push(terrDraft.length);
     if(!moved){ addTerrPoint(pts[0].lat, pts[0].lng); return; }
-    // keep at most ~60 corners so the saved shape stays small
-    const step = Math.max(1, Math.ceil(pts.length / 60));
-    const keep = pts.filter((_, i)=> i % step === 0 || i === pts.length - 1);
-    const before = terrDraft.slice(); terrDraft = [];
+    // a box replaces whatever was drafted, so a redo is just another drag
+    const b = L.latLngBounds(pts[0], pts[1] || pts[0]);
+    if(salesMap.latLngToContainerPoint(b.getNorthWest()).distanceTo(salesMap.latLngToContainerPoint(b.getSouthEast())) < 20){ terrUndo.pop(); return; } // ended where it started
+    terrUndo = [0]; terrDraft = [];
     if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; }
-    before.concat(keep.map(q=>[q.lat, q.lng])).forEach(([a, b])=> addTerrPoint(a, b));
+    [[b.getNorth(), b.getWest()], [b.getNorth(), b.getEast()], [b.getSouth(), b.getEast()], [b.getSouth(), b.getWest()]].forEach(([a, c])=> addTerrPoint(a, c));
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
@@ -4303,16 +4304,16 @@ function addTerrPoint(lat, lng){
   terrDraft.push([lat, lng]);
   if(terrDraftLayer) salesMap.removeLayer(terrDraftLayer);
   terrDraftLayer = (terrDraft.length > 2 ? L.polygon(terrDraft, { color:'#ffd166', weight:3, dashArray:'4 4', fillOpacity:.15, interactive:false }) : L.polyline(terrDraft, { color:'#ffd166', weight:3, interactive:false })).addTo(salesMap);
-  setStatus('terrStatus', terrDraft.length < 3 ? 'Keep going: drag your finger around the area, or tap more corners.' : 'Tap Finish when it covers the area, or Undo to back up.');
+  setStatus('terrStatus', terrDraft.length < 3 ? 'Keep tapping corners, or drag across the map to draw a box instead.' : 'Tap Finish when it covers the area. Drag again to redo the box.');
 }
 function cancelTerrDraft(){ terrDraft = null; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } terrDrawUi(false); setStatus('terrStatus', ''); }
 document.getElementById('terrDrawBtn').addEventListener('click', ()=>{
   if(!salesMap) openSalesMap(); if(!salesMap) return;
   terrDraft = []; terrUndo = []; terrDrawUi(true); document.getElementById('terrForm').hidden = true;
-  setStatus('terrStatus', 'Drag your finger around the area on the map, or tap its corners. Use + / − to zoom.');
+  setStatus('terrStatus', 'Drag across the map to draw a box, or tap corners one by one for an odd shape. Use + / − to zoom.');
   document.getElementById('salesMap').scrollIntoView({ behavior:'smooth', block:'center' });
 });
-document.getElementById('terrUndoBtn').addEventListener('click', ()=>{ if(!terrDraft || !terrDraft.length) return; const p = terrDraft.slice(0, terrUndo.length ? terrUndo.pop() : terrDraft.length - 1); terrDraft = []; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } p.forEach(([a,b])=>addTerrPoint(a, b)); if(!p.length) setStatus('terrStatus', 'Drag your finger around the area on the map, or tap its corners.'); });
+document.getElementById('terrUndoBtn').addEventListener('click', ()=>{ if(!terrDraft || !terrDraft.length) return; const p = terrDraft.slice(0, terrUndo.length ? terrUndo.pop() : terrDraft.length - 1); terrDraft = []; if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; } p.forEach(([a,b])=>addTerrPoint(a, b)); if(!p.length) setStatus('terrStatus', 'Drag across the map to draw a box, or tap corners one by one for an odd shape.'); });
 document.getElementById('terrCancelBtn').addEventListener('click', cancelTerrDraft);
 function fillRepNames(){
   const names = new Set(territories.map(t=>t.rep).concat(roster.map(r=>r.name)).filter(Boolean));
