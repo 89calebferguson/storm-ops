@@ -778,7 +778,8 @@
       <div class="field"><label>Notes (optional)</label><input type="text" id="terrNotes" placeholder="Streets, start point, anything to know"></div>
       <div class="btn-row"><button class="small-btn go" id="terrSaveBtn" type="button">Save Territory</button><button class="small-btn" id="terrFormCancel" type="button">Cancel</button><button class="small-btn del" id="terrDeleteBtn" type="button" hidden>Delete</button></div>
     </div>
-    <div id="terrList" style="margin-bottom:22px;"></div>
+    <div id="terrList" style="margin-bottom:12px;"></div>
+    <div id="terrHomes" style="margin-bottom:22px;"></div>
 
     <p class="section-label">Storm &amp; Outage Reports</p>
     <div class="storm-links">
@@ -2504,7 +2505,7 @@ let customCounties = {};
 // automatically when the map layer comes back without a name.
 // Cook IL: Assessor open data (Socrata, no key). Point -> PIN from the
 // parcel centroid table, then PIN -> taxpayer / owner of record.
-const OWNER_PLACEHOLDER = /^(exempt|taxpayer of|current owner|unknown|owner|occupant|resident|n\/a|none)\b/i;
+const OWNER_PLACEHOLDER = /^(exempt|taxpayer of|current owner|unknown|occupant|resident|n\/a|none)\b/i;
 const COUNTY_OWNER_SOURCES = {
   'cook|illinois': async (lat, lng, p)=>{
     const SOC = 'https://datacatalog.cookcountyil.gov/resource/';
@@ -4340,7 +4341,9 @@ document.getElementById('terrSaveBtn').addEventListener('click', async ()=>{
     const t = territories.find(x=>x.id === terrEditId);
     Object.assign(t, { name, rep, notes, updated: Date.now() });
   }else{
-    territories.push({ id:'t_' + Date.now(), name, rep, notes, points: terrDraft.slice(), time: Date.now(), areaId: currentAreaId });
+    const nt = { id:'t_' + Date.now(), name, rep, notes, points: terrDraft.slice(), time: Date.now(), areaId: currentAreaId };
+    territories.push(nt);
+    setTimeout(()=> loadTerritoryHomes(nt.id), 50);
     if(terrDraftLayer){ salesMap.removeLayer(terrDraftLayer); terrDraftLayer = null; }
     terrDraft = null; terrDrawUi(false);
   }
@@ -4364,6 +4367,151 @@ function pointInPoly(lat, lng, pts){
     if(((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
   }
   return inside;
+}
+// ---------- every address + owner inside a drawn territory ----------
+// Where the county publishes it: the county's own parcel layer (owner when
+// the layer has it), Cook IL through the Assessor's open data. Anywhere
+// else: every street address in the free open map, owners blank.
+const TERR_MAX = 2500;
+const COUNTY_BULK_OWNERS = {
+  'cook|illinois': async (t, onStep)=>{
+    const SOC = 'https://datacatalog.cookcountyil.gov/resource/';
+    const lats = t.points.map(p=>p[0]), lngs = t.points.map(p=>p[1]);
+    const w = `lat between ${Math.min(...lats).toFixed(6)} and ${Math.max(...lats).toFixed(6)} and lon between ${Math.min(...lngs).toFixed(6)} and ${Math.max(...lngs).toFixed(6)}`;
+    const yr = await fetchJSON(`${SOC}nj4t-kc8j.json?$select=max(year)%20as%20y&$where=${encodeURIComponent(w)}`, {}, 20000);
+    const Y = yr && yr[0] && yr[0].y; if(!Y) return [];
+    const rows = await fetchJSON(`${SOC}nj4t-kc8j.json?$select=pin,lat,lon&$where=${encodeURIComponent(w + ' and year=' + Y)}&$limit=20000`, {}, 30000);
+    const inside = (rows || []).filter(r=> pointInPoly(+r.lat, +r.lon, t.points)).slice(0, TERR_MAX);
+    const byPin = new Map(inside.map(r=>[r.pin, { pin:r.pin, lat:+r.lat, lng:+r.lon, address:'', owner:'', mail:'' }]));
+    const pins = [...byPin.keys()];
+    const ok = v=> v && !OWNER_PLACEHOLDER.test(String(v).trim());
+    for(let i = 0; i < pins.length; i += 80){
+      if(onStep) onStep(`Getting owners: ${Math.min(i + 80, pins.length)} of ${pins.length}…`);
+      const list = pins.slice(i, i + 80).map(p=>`'${p}'`).join(',');
+      const d = await fetchJSON(`${SOC}3723-97qp.json?$where=${encodeURIComponent(`pin in(${list}) and year>=${+Y - 1}`)}&$order=year%20DESC&$limit=1000`, {}, 30000).catch(()=>[]);
+      for(const r of d || []){
+        const h = byPin.get(r.pin); if(!h || h.owner) continue;
+        h.owner = ok(r.owner_address_name) ? r.owner_address_name : ok(r.mail_address_name) ? r.mail_address_name : '';
+        h.address = r.prop_address_full ? [r.prop_address_full, r.prop_address_city_name].filter(Boolean).join(', ') : h.address;
+        h.mail = [r.mail_address_full, r.mail_address_city_name, [r.mail_address_state, r.mail_address_zipcode_1].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      }
+    }
+    return [...byPin.values()].map(h=>({ ...h, pin: h.pin.replace(/^(\d{2})(\d{2})(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3-$4-$5') }));
+  }
+};
+async function homesFromCountyLayer(t, src, onStep){
+  const base = src.url.replace(/\/$/, '');
+  const ring = t.points.map(([la, lo])=>[lo, la]); ring.push(ring[0]);
+  const geo = `geometry=${encodeURIComponent(JSON.stringify({ rings:[ring], spatialReference:{ wkid:4326 } }))}&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects`;
+  const ids = await fetchJSON(`${base}/query`, { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body: geo + '&returnIdsOnly=true&f=json' }, 30000);
+  if(ids.error) throw new Error(ids.error.message || 'county server error');
+  const list = (ids.objectIds || []).slice(0, TERR_MAX), out = [];
+  for(let i = 0; i < list.length; i += 200){
+    if(onStep) onStep(`Getting lots: ${Math.min(i + 200, list.length)} of ${list.length}…`);
+    const body = `objectIds=${list.slice(i, i + 200).join(',')}&outFields=*&returnGeometry=true&returnCentroid=true&outSR=4326&geometryPrecision=6&maxAllowableOffset=0.0001&f=json`;
+    const d = await fetchJSON(`${base}/query`, { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body }, 45000);
+    for(const f of (d && d.features) || []){
+      const a = f.attributes || {}, g = f.geometry || {};
+      let lat = null, lng = null;
+      if(f.centroid){ lat = f.centroid.y; lng = f.centroid.x; }
+      else if(g.rings && g.rings[0]){ const r = g.rings[0]; lng = r.reduce((s, p)=>s + p[0], 0) / r.length; lat = r.reduce((s, p)=>s + p[1], 0) / r.length; }
+      const v = k=>{ const m = matchField(a, k); return m ? String(m.value) : ''; };
+      out.push({ pin: v('parcel'), address: v('address'), owner: v('owner'), mail: v('mail'), lat, lng });
+    }
+  }
+  return out;
+}
+async function homesFromOpenMap(t){
+  const poly = t.points.map(([la, lo])=>`${la.toFixed(6)} ${lo.toFixed(6)}`).join(' ');
+  const d = await overpass(`[out:json][timeout:40];nwr["addr:housenumber"](poly:"${poly}");out center tags ${TERR_MAX};`, 50000);
+  const seen = new Set();
+  return (d.elements || []).map(el=>{
+    const tg = el.tags || {}, la = el.lat || (el.center && el.center.lat), lo = el.lon || (el.center && el.center.lon);
+    const address = [[tg['addr:housenumber'], tg['addr:street']].filter(Boolean).join(' '), tg['addr:city']].filter(Boolean).join(', ');
+    if(!address || seen.has(address)) return null; seen.add(address);
+    return { pin:'', address, owner:'', mail:'', lat:la, lng:lo };
+  }).filter(Boolean);
+}
+async function loadTerritoryHomes(id){
+  const t = territories.find(x=>x.id === id); if(!t) return;
+  const el = document.getElementById('terrHomes');
+  const step = msg=>{ el.innerHTML = `<div class="install-box"><div class="card-name">${escapeHtml(t.name)}</div><div class="card-sub wrap">${escapeHtml(msg)}</div></div>`; };
+  if(!navigator.onLine){ step('No signal. Addresses load once you have a connection.'); return; }
+  step('Finding every address in this area…');
+  el.scrollIntoView({ behavior:'smooth', block:'start' });
+  const [cy, cx] = terrCenter(t);
+  let county = '', state = '';
+  try{ const g = await reverseGeocode(cy, cx); county = g.county; state = g.state; }catch(e){}
+  const a = currentArea();
+  if(!county && a){ county = a.county; state = a.state; }
+  const key = (county || '').toLowerCase().replace(/\s*county\s*/, '').trim() + '|' + (state || '').toLowerCase().trim();
+  let homes = [], src = '';
+  try{
+    if(COUNTY_BULK_OWNERS[key]){ homes = await COUNTY_BULK_OWNERS[key](t, step); src = `${county} County Assessor records`; }
+    if(!homes.length){
+      let ps = parcelSourceFor(county, state);
+      if(!ps && county){ try{ ps = await withTimeout(ensureParcelSource(county, state, cy, cx), 45000); }catch(e){} }
+      if(ps){ homes = await homesFromCountyLayer(t, ps, step); src = `${county} County parcel map`; }
+    }
+  }catch(e){ homes = []; }
+  if(!homes.length){
+    step('County records didn\'t answer. Getting addresses from the open map instead…');
+    try{ homes = await homesFromOpenMap(t); src = 'open map (addresses only, no owners)'; }catch(e){}
+  }
+  if(!homes.length){ step('Couldn\'t load addresses for this area. The servers may be busy; tap 🏠 on the territory to try again.'); return; }
+  homes.sort((x, y)=> (x.address || '').localeCompare(y.address || '', undefined, { numeric:true }));
+  await setJSON('terrHomes:' + t.id, { time: Date.now(), src, homes });
+  t.homes = homes.length; await saveTerritories(); renderTerritories();
+  showTerritoryHomes(t.id);
+}
+let terrHomesView = null;
+async function showTerritoryHomes(id, filter){
+  const t = territories.find(x=>x.id === id); if(!t) return;
+  const saved = await getJSON('terrHomes:' + id, null);
+  if(!saved){ loadTerritoryHomes(id); return; }
+  terrHomesView = { id, homes: saved.homes };
+  const q = (filter || '').toLowerCase();
+  const list = q ? saved.homes.filter(h=> (h.address + ' ' + h.owner).toLowerCase().includes(q)) : saved.homes;
+  const owners = saved.homes.filter(h=>h.owner).length;
+  const el = document.getElementById('terrHomes');
+  el.innerHTML = `<div class="install-box">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;"><div class="card-name">🏠 ${escapeHtml(t.name)}${t.rep ? ' · ' + escapeHtml(t.rep) : ''}</div><button class="small-btn" onclick="document.getElementById('terrHomes').innerHTML=''">Close</button></div>
+    <div class="card-sub wrap">${saved.homes.length} addresses · ${owners} with owner names · from ${escapeHtml(saved.src)} · loaded ${timeAgo(saved.time)}</div>
+    <div class="btn-row" style="margin:8px 0;">
+      <button class="small-btn go" onclick="terrHomesToLeads('${id}')">+ Add all as leads</button>
+      <button class="small-btn" onclick="exportTerritoryHomes('${id}')">📤 Export list</button>
+      <button class="small-btn" onclick="loadTerritoryHomes('${id}')">↻ Reload</button>
+    </div>
+    <div class="field" style="margin:0 0 6px;"><input type="text" placeholder="Search address or owner" value="${escapeHtml(filter || '')}" oninput="clearTimeout(window._thq); const v=this.value; window._thq=setTimeout(()=>showTerritoryHomes('${id}', v).then(()=>{ const i=document.querySelector('#terrHomes input'); if(i){ i.focus(); i.setSelectionRange(v.length, v.length); } }), 250)"></div>
+    <div class="terr-homes">${list.slice(0, 300).map((h, i)=>`<div class="shop-card" style="padding:9px 11px;">
+      <div class="shop-top"><div class="shop-name" style="font-size:14px;">${escapeHtml(h.address || 'No street address')}</div>${h.pin ? `<div class="shop-sub" style="margin:0;">${escapeHtml(h.pin)}</div>` : ''}</div>
+      <div class="shop-sub">${h.owner ? '<b>' + escapeHtml(h.owner) + '</b>' : 'Owner not listed'}${h.mail && h.mail.toLowerCase().indexOf((h.address || '').split(',')[0].toLowerCase()) < 0 ? ' · mails to ' + escapeHtml(h.mail) : ''}</div>
+      <div class="shop-btns" style="margin-top:6px;"><button onclick="terrHomeToLead('${id}', ${saved.homes.indexOf(h)})">+ Lead</button>${h.lat != null ? `<a href="https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}" target="_blank" rel="noopener">📍 Map</a>` : ''}</div>
+    </div>`).join('')}${list.length > 300 ? `<div class="cat-empty">Showing 300 of ${list.length}. Search to narrow it down.</div>` : ''}</div>
+  </div>`;
+}
+function homeToLead(h){ return { id:'l_' + Date.now() + '_' + Math.floor(Math.random()*1e4), name: h.owner || h.address || 'Property', address: h.address, phone:'', owner: h.owner, mail: h.mail, status:'New', notes: h.pin ? 'Parcel ' + h.pin : '', lat: h.lat, lng: h.lng }; }
+async function terrHomeToLead(id, i){
+  const s = await getJSON('terrHomes:' + id, null); const h = s && s.homes[i]; if(!h) return;
+  if(leads.some(l=> l.address && l.address === h.address)){ toast('Already a lead.'); return; }
+  leads.push(homeToLead(h)); await saveLeads(); renderSales(); renderTerritories(); toast('Added ' + (h.address || 'it') + ' to leads.');
+}
+async function terrHomesToLeads(id){
+  const s = await getJSON('terrHomes:' + id, null); if(!s) return;
+  const have = new Set(leads.map(l=>l.address).filter(Boolean));
+  const add = s.homes.filter(h=> h.address && !have.has(h.address)).map(homeToLead);
+  if(!add.length){ toast('They\'re all leads already.'); return; }
+  const undo = offerUndo('Leads', ()=>leads, v=>{ leads = v; }, async ()=>{ await saveLeads(); renderSales(); renderTerritories(); });
+  leads = leads.concat(add); await saveLeads(); renderSales(); renderTerritories(); undo();
+  toast(`Added ${add.length} leads.`);
+}
+async function exportTerritoryHomes(id){
+  const t = territories.find(x=>x.id === id); const s = await getJSON('terrHomes:' + id, null); if(!s || !t) return;
+  const esc = v=> '"' + String(v || '').replace(/"/g, '""') + '"';
+  const csv = ['Address,Owner,Mailing address,Parcel,Lat,Lng'].concat(s.homes.map(h=>[h.address, h.owner, h.mail, h.pin, h.lat, h.lng].map(esc).join(','))).join('\n');
+  const file = new File([csv], (t.name || 'territory').replace(/[^\w-]+/g, '_') + '-addresses.csv', { type:'text/csv' });
+  try{ if(navigator.canShare && navigator.canShare({ files:[file] })){ await navigator.share({ files:[file], title: t.name + ' addresses' }); return; } }catch(e){ if(e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
 }
 function leadsIn(t){ return leads.filter(l=> l.lat != null && pointInPoly(l.lat, l.lng, t.points)); }
 function drawTerritories(){
@@ -4402,7 +4550,7 @@ function renderTerritories(){
     const n = leadsIn(t).length;
     return `<div class="card"><span class="terr-sw" style="background:${t.color || repColor(t.rep)}"></span>
       <div class="card-body"><div class="card-name">${escapeHtml(t.name)}</div><div class="card-sub wrap">${(()=>{ const [y, x] = terrCenter(t), k = cityOf(y, x); return k ? escapeHtml(k.name) + ' · ' : ''; })()}${n} lead${n === 1 ? '' : 's'} inside${t.notes ? ' · ' + escapeHtml(t.notes) : ''}</div></div>
-      <div class="card-actions"><button class="icon-btn" onclick="zoomTerritory('${t.id}')" aria-label="Show on map">🔍</button><button class="icon-btn" onclick="openTerrForm(territories.find(x=>x.id==='${t.id}'))" aria-label="Edit">✏️</button></div></div>`;
+      <div class="card-actions"><button class="small-btn" onclick="showTerritoryHomes('${t.id}')">🏠 ${t.homes != null ? t.homes : 'Homes'}</button><button class="icon-btn" onclick="zoomTerritory('${t.id}')" aria-label="Show on map">🔍</button><button class="icon-btn" onclick="openTerrForm(territories.find(x=>x.id==='${t.id}'))" aria-label="Edit">✏️</button></div></div>`;
   }).join('')).join('') + '<button class="small-btn" style="display:block; width:100%; margin-top:8px;" onclick="shareTerritories()">📤 Send territories to the crew</button>';
 }
 
