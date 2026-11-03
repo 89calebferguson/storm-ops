@@ -275,6 +275,16 @@
 
   /* live nearby search */
   #salesMap.drawing{ outline:3px solid #ffd166; cursor:crosshair; }
+  .tab{ position:relative; }
+  .tab-badge{ position:absolute; top:3px; right:6px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:#d7263d; color:#fff; font-size:11px; line-height:18px; font-family:var(--font-mono); }
+  .wt-sum{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  .wt-pill{ border-radius:16px; padding:6px 11px; font-size:13px; font-weight:600; border:1px solid var(--line); background:var(--panel); }
+  .wt-pill.t1{ background:#d7263d; border-color:#d7263d; color:#fff; } .wt-pill.t2{ background:#f08c00; border-color:#f08c00; color:#fff; } .wt-pill.t3{ background:#ffd43b; border-color:#e6b800; color:#3a2f00; }
+  .wt-card{ border-left:6px solid var(--line); }
+  .wt-card.t1{ border-left-color:#d7263d; } .wt-card.t2{ border-left-color:#f08c00; } .wt-card.t3{ border-left-color:#e6b800; }
+  .wt-tag{ font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:10px; background:var(--bg); border:1px solid var(--line); margin-left:6px; white-space:nowrap; }
+  .wt-key{ font-size:13.5px; font-weight:600; margin-top:4px; }
+  .wt-new{ background:#d7263d; color:#fff; border-color:#d7263d; }
   .shop-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin:2px 0 8px; }
   .shop-town{ font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1.1; }
   .shop-chips{ display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; margin:0 -2px; scrollbar-width:none; }
@@ -562,6 +572,7 @@
   <button class="where-bar" id="whereBar" type="button" onclick="document.querySelector('.tab[data-tab=\'here\']').click()">📍 <span id="whereText">No area loaded. Tap here, then I'm Here.</span></button>
   <div class="tabs">
     <button class="tab active" data-tab="here"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Here</span></button>
+    <button class="tab" data-tab="watch"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/><path d="M3 18h6"/></svg><span>Watch</span><b class="tab-badge" id="watchBadge" hidden></b></button>
     <button class="tab" data-tab="contacts"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Contacts</span></button>
     <button class="tab" data-tab="maintenance"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>Shops</span></button>
     <button class="tab" data-tab="owner"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>Owner</span></button>
@@ -1012,6 +1023,26 @@
   </div>
 
   <!-- SAFETY VIEW -->
+  <div class="view" id="view-watch">
+    <div class="shop-head">
+      <div><p class="eyebrow">Storm Watch</p><div class="shop-town">Wind &amp; outage threats</div></div>
+      <button class="small-btn" id="watchRefreshBtn">↻ Refresh</button>
+    </div>
+    <p class="hint">Live National Weather Service warnings and watches for anything that can bring trees down or knock out power: high winds, severe storms, ice and heavy wet snow. Plus the 3-day storm outlook. Checks again every 10 minutes while the app is open.</p>
+    <div class="status-line" id="watchStatus"></div>
+    <div id="watchSummary"></div>
+    <div class="mini-map" id="watchMap" style="height:300px; margin:8px 0 4px;"></div>
+    <p class="mini-cap" id="watchMapCap">Red = big outage risk · orange = watch it · yellow = minor · shaded = storm outlook.</p>
+    <div id="watchOutlook"></div>
+    <div id="watchList"></div>
+    <details class="job-more" style="margin-top:14px;"><summary>States to watch (<span id="watchStateCount"></span>)</summary><div class="job-chips" id="watchStates" style="margin-top:8px;"></div></details>
+    <div class="install-box" style="margin-top:10px;">
+      <div class="card-name">Heads-up on this device</div>
+      <div class="card-sub wrap" id="watchNotifyLine">Get a pop-up when a new big-risk warning shows up. Works while the app is open or in the background.</div>
+      <button class="small-btn go" id="watchNotifyBtn" style="margin-top:6px;">🔔 Turn on storm pop-ups</button>
+    </div>
+  </div>
+
   <div class="view" id="view-affected">
     <p class="section-label">Affected Areas</p>
     <p class="hint">Shows where storm damage and outages are piling up, and where the strongest gusts hit, around the working area.</p>
@@ -1366,6 +1397,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'here') renderCities();
     if(btn.dataset.tab === 'owner') initOwnerPick();
+    if(btn.dataset.tab === 'watch'){ const b = document.getElementById('watchBadge'); b.hidden = true; b.textContent = ''; loadWatch(); renderWatchNotify(); setTimeout(()=>{ if(miniMaps.watchMap) miniMaps.watchMap.invalidateSize(); else if(watchData) drawWatchMap(watchData.alerts); }, 80); }
     if(btn.dataset.tab === 'here' && miniMaps.hereMiniMap) setTimeout(()=>miniMaps.hereMiniMap.invalidateSize(), 50);
     if(btn.dataset.tab === 'affected') openAffected();
     if(btn.dataset.tab === 'debris') openDebris();
@@ -5216,6 +5248,7 @@ async function refreshArea(area, opts = {}){
 
 // Every tab follows the working area: contacts, shops, owner, map, affected,
 // debris, weather. Called whenever the area changes.
+function active0(){ const t = document.querySelector('.tab.active'); return t ? t.dataset.tab : ''; }
 function announceArea(a){
   renderAll();
   renderWhere();
@@ -5224,6 +5257,8 @@ function announceArea(a){
   if(affMap){ affMap._fitted = false; }
   affData = null; debrisData = null;
   ownerPickFor = null;
+  if(miniMaps.watchMap){ miniMaps.watchMap._wFit = false; }
+  if(active0() === 'watch') loadWatch(true);
   const active = document.querySelector('.tab.active');
   if(active && active.dataset.tab === 'affected') openAffected();
   if(active && active.dataset.tab === 'debris') openDebris();
@@ -5972,6 +6007,241 @@ function attachTownAutocomplete(inputId, listId, onPick){
 attachTownAutocomplete('hereTownInput', 'acListHere', pick=> arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }));
 attachTownAutocomplete('contactsTownInput', 'acListContacts', pick=>{ setStatus('hereStatus', 'Loading ' + pick.name + '…'); toast('Loading ' + pick.name + '. Contacts fill in as they arrive.'); arriveAt(pick.lat, pick.lng, pick.name, { src:'typed' }); });
 
+// ---------- Storm Watch ----------
+// Free NWS alerts for the states Caleb works in, ranked by how likely they
+// are to bring high winds, ice or big power outages (what he's after), so the
+// crew can get moving before the next storm.
+const WATCH_DEFAULT_STATES = ['IL','IN','IA','MO','WI','MI','OH','KY'];
+const WATCH_EVENTS = {
+  1: /^(tornado (warning|watch)|extreme wind warning|high wind warning|ice storm warning|hurricane (warning|watch)|typhoon warning|tropical storm warning|blizzard warning|derecho)/i,
+  2: /^(severe thunderstorm (warning|watch)|high wind watch|winter storm (warning|watch)|tropical storm watch|storm warning|hurricane force wind warning)/i,
+  3: /^(wind advisory|freezing rain advisory|winter weather advisory|severe weather statement|freezing fog advisory)/i
+};
+let watchStates = null, watchData = null, watchTimer = null, watchMapLayers = null;
+function watchTier(p){
+  const ev = p.event || '', txt = (p.headline || '') + ' ' + (p.description || '');
+  const gust = watchGust(p), ice = /ice accumulation|freezing rain|glaze/i.test(txt);
+  let t = 0;
+  for(const k of [1, 2, 3]) if(WATCH_EVENTS[k].test(ev)){ t = k; break; }
+  if(!t) return 0;
+  // winter products only matter here when they carry ice or real wind
+  // (heavy wet snow on leafed or loaded trees brings them down too)
+  const wetSnow = /heavy,? wet snow|wet,? heavy snow|tree damage|downed trees|trees down/i.test(txt);
+  if(/winter (storm|weather)|freezing fog/i.test(ev) && !ice && !wetSnow && !(gust >= 45)) return 0;
+  const dmg = ((p.parameters || {}).thunderstormDamageThreat || [''])[0];
+  if(/severe thunderstorm warning/i.test(ev) && (/destructive|considerable/i.test(dmg) || gust >= 70)) t = 1;
+  if(/winter storm warning/i.test(ev) && /ice accumulations? of (a quarter|one quarter|0?\.[2-9]|1|one half|half)/i.test(txt)) t = 1;
+  if(t > 1 && gust >= 70) t = 1;
+  if(/derecho|widespread (damaging winds|power outages)/i.test(txt)) t = 1;
+  return t;
+}
+function watchGust(p){
+  const prm = (p.parameters || {}).maxWindGust; let g = 0;
+  if(prm && prm[0]){ const m = String(prm[0]).match(/(\d+)/); if(m) g = +m[1]; }
+  const txt = (p.headline || '') + ' ' + (p.description || '');
+  for(const m of txt.matchAll(/(?:gusts?|winds?)[^.]{0,40}?(\d{2,3})\s*mph/gi)) g = Math.max(g, +m[1]);
+  return g;
+}
+function watchIce(p){
+  const m = ((p.description || '') + ' ' + (p.headline || '')).match(/ice accumulations?[^.]{0,70}/i);
+  return m ? m[0].replace(/\s+/g, ' ').trim() : '';
+}
+function watchStatesOf(p){
+  const ugc = ((p.geocode || {}).UGC || []);
+  return [...new Set(ugc.map(u=>u.slice(0, 2)))];
+}
+function centroidOf(geom){
+  if(!geom || !geom.coordinates) return null;
+  let xs = 0, ys = 0, n = 0;
+  const walk = c=>{ if(typeof c[0] === 'number'){ xs += c[0]; ys += c[1]; n++; } else c.forEach(walk); };
+  walk(geom.coordinates);
+  return n ? { lat: ys / n, lng: xs / n } : null;
+}
+async function loadWatch(force){
+  if(!watchStates) watchStates = await getJSON('watchStates', null);
+  if(!watchStates){ const a = currentArea(); watchStates = [...new Set([...(a && a.stateCode ? [a.stateCode] : []), ...WATCH_DEFAULT_STATES])]; }
+  if(!watchData) watchData = await getJSON('watchData', null);
+  if(!force && watchData && watchData.outlook && watchData.areaId === currentAreaId && Date.now() - watchData.time < 5*60000 && watchData.states === watchStates.join(',')){ renderWatch(); return; }
+  if(!navigator.onLine){ setStatus('watchStatus', watchData ? `No signal. Showing what was saved ${timeAgo(watchData.time)}.` : 'No signal and nothing saved yet.', 'warn'); renderWatch(); return; }
+  setStatus('watchStatus', 'Checking the National Weather Service…');
+  const H = { headers:{ 'Accept':'application/geo+json' } };
+  const [al, out] = await Promise.all([
+    fetchJSON(`https://api.weather.gov/alerts/active?area=${watchStates.join(',')}&status=actual`, H, 25000).catch(e=>({ error:e })),
+    loadOutlooks().catch(()=>null)
+  ]);
+  if(al.error){ setStatus('watchStatus', watchData ? `Couldn't reach the weather service. Showing what was saved ${timeAgo(watchData.time)}.` : 'Couldn\'t reach the weather service. Try again in a minute.', 'warn'); renderWatch(); return; }
+  const a = currentArea();
+  const alerts = (al.features || []).map(f=>{
+    const p = f.properties || {}, t = watchTier(p);
+    if(!t) return null;
+    const c = centroidOf(f.geometry);
+    return { id: p.id || f.id, tier: t, event: p.event, headline: p.headline || '', area: p.areaDesc || '', states: watchStatesOf(p),
+      onset: p.onset || p.effective, ends: p.ends || p.expires, gust: watchGust(p), ice: watchIce(p), description: p.description || '', instruction: p.instruction || '',
+      geom: f.geometry || null, dist: c && a ? distMiles(a.lat, a.lng, c.lat, c.lng) : null };
+  }).filter(Boolean);
+  const seen = new Set(await getJSON('watchSeen', []));
+  const fresh = alerts.filter(x=> !seen.has(x.id) && x.tier <= 2);
+  watchData = { time: Date.now(), states: watchStates.join(','), areaId: currentAreaId, alerts, outlook: out || (watchData && watchData.outlook) || null };
+  await setJSON('watchData', watchData);
+  await setJSON('watchSeen', alerts.map(x=>x.id));
+  if(fresh.length && seen.size) watchHeadsUp(fresh);
+  setStatus('watchStatus', `Checked ${watchStates.length} states just now.`, 'ok');
+  renderWatch();
+}
+function watchHeadsUp(fresh){
+  const big = fresh.filter(x=>x.tier === 1);
+  const pick = (big.length ? big : fresh)[0];
+  const msg = `${fresh.length} new storm alert${fresh.length > 1 ? 's' : ''}: ${pick.event} · ${pick.states.join(', ')}${pick.gust ? ' · gusts ' + pick.gust + ' mph' : ''}`;
+  toast(msg);
+  const active = document.querySelector('.tab.active');
+  if(!active || active.dataset.tab !== 'watch'){ const b = document.getElementById('watchBadge'); b.hidden = false; b.textContent = String(+(b.textContent || 0) + fresh.length); }
+  try{
+    if('Notification' in window && Notification.permission === 'granted'){
+      const opts = { body: msg, tag: 'stormwatch', icon: 'icon-192.png' };
+      if(navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(r=> r.showNotification('Storm Ops · Storm Watch', opts)).catch(()=> new Notification('Storm Ops · Storm Watch', opts));
+      else new Notification('Storm Ops · Storm Watch', opts);
+    }
+  }catch(e){}
+}
+function watchWhen(x){
+  const f = d=> d ? new Date(d).toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit' }) : '';
+  const now = Date.now(), on = x.onset ? Date.parse(x.onset) : 0;
+  return (on > now ? 'Starts ' + f(x.onset) + ' · ' : 'Now · ') + (x.ends ? 'until ' + f(x.ends) : '');
+}
+function renderWatch(){
+  const sumEl = document.getElementById('watchSummary'), listEl = document.getElementById('watchList');
+  renderWatchStates();
+  if(!watchData){ listEl.innerHTML = '<div class="empty-state">Tap ↻ Refresh to check for storms.</div>'; return; }
+  const al = watchData.alerts.slice().sort((a, b)=> a.tier - b.tier || (a.dist == null ? 1e9 : a.dist) - (b.dist == null ? 1e9 : b.dist));
+  const n = t=> al.filter(x=>x.tier === t).length;
+  const byState = {};
+  al.forEach(x=> x.states.forEach(st=>{ if(watchStates.includes(st)){ byState[st] = byState[st] || [0, 0, 0]; byState[st][x.tier - 1]++; } }));
+  sumEl.innerHTML = `<div class="wt-sum"><span class="wt-pill t1">${n(1)} big outage risk</span><span class="wt-pill t2">${n(2)} watch it</span><span class="wt-pill t3">${n(3)} minor</span></div>`
+    + (Object.keys(byState).length ? `<div class="wt-sum">${Object.entries(byState).sort((a, b)=> b[1][0] - a[1][0] || b[1][1] - a[1][1]).map(([st, c])=>`<span class="wt-pill">${st}: ${c[0] ? c[0] + ' big' : ''}${c[0] && c[1] ? ', ' : ''}${c[1] ? c[1] + ' watch' : ''}${!c[0] && !c[1] ? c[2] + ' minor' : ''}</span>`).join('')}</div>` : '<div class="card-sub">Nothing active for high winds or ice in these states right now.</div>');
+  // group repeats (a line of storms throws off many warnings) by event + state
+  const groups = new Map();
+  al.forEach(x=>{ const k = x.event + '|' + x.states.join(','); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
+  const seenNow = watchData.time;
+  listEl.innerHTML = [...groups.values()].map(g=>{
+    const x = g[0], worstGust = Math.max(...g.map(y=>y.gust || 0));
+    const tag = x.tier === 1 ? 'Big outage risk' : x.tier === 2 ? 'Watch it' : 'Minor';
+    const near = g.map(y=>y.dist).filter(d=>d != null).sort((a, b)=>a-b)[0];
+    return `<details class="shop-card wt-card t${x.tier}">
+      <summary style="list-style:none; cursor:pointer;">
+        <div class="shop-top"><div class="shop-name">${escapeHtml(x.event)}${g.length > 1 ? ` ×${g.length}` : ''}<span class="wt-tag">${tag}</span></div><div class="shop-dist">${escapeHtml(x.states.join(', '))}</div></div>
+        ${worstGust || x.ice ? `<div class="wt-key">${worstGust ? `💨 Gusts to ${worstGust} mph` : ''}${worstGust && x.ice ? ' · ' : ''}${x.ice ? '🧊 ' + escapeHtml(x.ice) : ''}</div>` : ''}
+        <div class="shop-sub">${escapeHtml(watchWhen(x))}${near != null ? ` · ${Math.round(near)} mi from ${escapeHtml(bareTown((currentArea() || {}).town || 'you'))}` : ''}</div>
+        <div class="shop-sub">${escapeHtml(x.area.split(';').slice(0, 6).join(', '))}${x.area.split(';').length > 6 ? '…' : ''}</div>
+      </summary>
+      ${g.map(y=>`<p class="card-sub wrap" style="white-space:pre-wrap; margin-top:8px;">${escapeHtml(y.headline)}\n\n${escapeHtml(y.description).slice(0, 1500)}${y.instruction ? '\n\n' + escapeHtml(y.instruction).slice(0, 500) : ''}</p>`).slice(0, 3).join('<hr style="border:none;border-top:1px solid var(--line);">')}
+    </details>`;
+  }).join('') || '';
+  renderOutlook();
+  drawWatchMap(al);
+}
+function renderWatchStates(){
+  const el = document.getElementById('watchStates'); if(!el || !watchStates) return;
+  document.getElementById('watchStateCount').textContent = watchStates.join(', ');
+  const all = Object.values(STATE_CODES).filter(c=>c !== 'DC').sort();
+  el.innerHTML = all.map(c=>`<button type="button" class="job-chip${watchStates.includes(c) ? ' on' : ''}" onclick="toggleWatchState('${c}')">${c}</button>`).join('');
+}
+async function toggleWatchState(c){
+  watchStates = watchStates.includes(c) ? watchStates.filter(x=>x !== c) : watchStates.concat(c);
+  if(!watchStates.length) watchStates = [c];
+  await setJSON('watchStates', watchStates);
+  renderWatchStates();
+  clearTimeout(window._wsT); window._wsT = setTimeout(()=> loadWatch(true), 900);
+}
+function drawWatchMap(al){
+  if(typeof L === 'undefined') return;
+  const el = document.getElementById('watchMap'); if(!el || !el.offsetParent) return;
+  let m = miniMaps.watchMap;
+  if(!m){
+    const a = currentArea();
+    m = L.map(el, { zoomControl:true, attributionControl:false, zoomAnimation:false, fadeAnimation:false }).setView(a ? [a.lat, a.lng] : [40.5, -88.5], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12 }).addTo(m);
+    miniMaps.watchMap = m;
+    const a2 = currentArea(); if(a2) L.circleMarker([a2.lat, a2.lng], { radius:6, color:'#fff', weight:2, fillColor:'#2f80ed', fillOpacity:1 }).bindTooltip(bareTown(a2.town)).addTo(m);
+  }
+  if(watchMapLayers) m.removeLayer(watchMapLayers);
+  watchMapLayers = L.layerGroup().addTo(m);
+  const col = { 1:'#d7263d', 2:'#f08c00', 3:'#e6b800' };
+  const ol = watchData && watchData.outlook;
+  (ol && ol.areas || []).forEach(o=>{ try{ L.geoJSON(o.geom, { style:{ color:o.color, weight:1, fillColor:o.color, fillOpacity:.18, interactive:false } }).addTo(watchMapLayers); }catch(e){} });
+  let bounds = null;
+  al.slice().reverse().forEach(x=>{
+    if(!x.geom) return;
+    try{
+      const lyr = L.geoJSON(x.geom, { style:{ color: col[x.tier], weight: x.tier === 1 ? 3 : 2, fillColor: col[x.tier], fillOpacity: .28 } }).bindPopup(`<b>${escapeHtml(x.event)}</b><br>${escapeHtml(watchWhen(x))}${x.gust ? '<br>Gusts to ' + x.gust + ' mph' : ''}`).addTo(watchMapLayers);
+      if(x.tier <= 2){ const b = lyr.getBounds(); bounds = bounds ? bounds.extend(b) : b; }
+    }catch(e){}
+  });
+  setTimeout(()=>{ m.invalidateSize(); if(bounds && !m._wFit){ m.fitBounds(bounds, { padding:[20, 20], maxZoom: 8 }); m._wFit = true; } }, 60);
+  const noGeo = al.filter(x=>!x.geom).length;
+  document.getElementById('watchMapCap').textContent = 'Red = big outage risk · orange = watch it · yellow = minor · shaded = storm outlook.' + (noGeo ? ` ${noGeo} county-wide alert${noGeo > 1 ? 's are' : ' is'} listed below but not drawn.` : '');
+}
+// What's coming: SPC severe storm outlook for days 1-3 and WPC's ice impact
+// outlook, both free NOAA map services, for ~350 miles around the working town.
+const SPC = 'https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/';
+const WSSI = 'https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/wpc_wssi/MapServer/';
+const SPC_CAT = { 3:['Marginal', 1], 4:['Slight', 2], 5:['Enhanced', 3], 6:['Moderate', 4], 8:['High', 5] };
+async function loadOutlooks(){
+  const a = currentArea(); if(!a) return null;
+  const env = encodeURIComponent(`${a.lng - 6},${a.lat - 5},${a.lng + 6},${a.lat + 5}`);
+  const q = (base, id, where)=> fetchJSON(`${base}${id}/query?where=${encodeURIComponent(where)}&geometry=${env}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&maxAllowableOffset=0.03&f=geojson`, {}, 20000).catch(()=>null);
+  const [d1, d2, d3, ice] = await Promise.all([q(SPC, 1, 'dn>=3'), q(SPC, 9, 'dn>=3'), q(SPC, 17, 'dn>=3'), q(WSSI, 19, '1=1')]);
+  const days = [], areas = [];
+  [[1, d1], [2, d2], [3, d3]].forEach(([day, d])=>{
+    const fs = (d && d.features) || [];
+    let top = null, here = null;
+    fs.forEach(f=>{
+      const pr = f.properties || {}, cat = SPC_CAT[pr.dn]; if(!cat) return;
+      areas.push({ geom: f.geometry, color: pr.fill || '#f08c00', day });
+      if(!top || pr.dn > top.dn) top = { dn: pr.dn, label: cat[0], rank: cat[1], valid: pr.valid };
+      try{ if(f.geometry && L.geoJSON(f.geometry).getLayers().some(l=> l.getBounds().contains([a.lat, a.lng]) && pointInGeo(a.lat, a.lng, f.geometry)) && (!here || pr.dn > here.dn)) here = { dn: pr.dn, label: cat[0] }; }catch(e){}
+    });
+    days.push({ day, top, here, ok: !!d });
+  });
+  const iceAreas = ((ice && ice.features) || []).map(f=>{
+    const pr = f.properties || {};
+    const lbl = Object.values(pr).find(v=> typeof v === 'string' && /minor|moderate|major|extreme/i.test(v)) || '';
+    return { geom: f.geometry, label: lbl };
+  }).filter(x=> x.label && !/^minor/i.test(x.label));
+  iceAreas.forEach(x=> areas.push({ geom: x.geom, color: /extreme|major/i.test(x.label) ? '#7b2cbf' : '#4dabf7', ice:true }));
+  return { time: Date.now(), days, areas, ice: iceAreas.map(x=>x.label), iceOk: !!ice };
+}
+function pointInGeo(lat, lng, g){
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  return polys.some(rings=> pointInRings(lng, lat, rings));
+}
+function renderOutlook(){
+  const el = document.getElementById('watchOutlook'); if(!el) return;
+  const o = watchData && watchData.outlook;
+  if(!o){ el.innerHTML = ''; return; }
+  const name = d=> d === 1 ? 'Today' : new Date(Date.now() + (d - 1) * 86400000).toLocaleDateString([], { weekday:'long' });
+  const town = bareTown((currentArea() || {}).town || 'here');
+  const col = r=> r >= 3 ? 't1' : r === 2 ? 't2' : 't3';
+  el.innerHTML = `<p class="section-label" style="margin-top:14px;">Coming Up (severe storm outlook)</p>
+    <div class="wt-sum">${o.days.map(d=> d.top
+      ? `<span class="wt-pill ${col(d.top.rank)}">${name(d.day)}: ${d.top.label} risk nearby${d.here ? ` · ${d.here.label} at ${escapeHtml(town)}` : ''}</span>`
+      : `<span class="wt-pill">${name(d.day)}: ${d.ok ? 'no severe risk nearby' : 'outlook didn\'t load'}</span>`).join('')}</div>
+    ${o.ice && o.ice.length ? `<div class="wt-sum"><span class="wt-pill" style="background:#4dabf7;border-color:#4dabf7;color:#fff;">🧊 Ice impacts expected nearby in the next 3 days: ${escapeHtml([...new Set(o.ice)].join(', '))}</span></div>` : ''}
+    <p class="hint">Slight risk or higher means damaging winds are possible: start lining up crews and gear. Enhanced or higher usually means widespread trees down and outages.</p>`;
+}
+function startWatchTimer(){ if(watchTimer) return; watchTimer = setInterval(()=>{ if(!document.hidden) loadWatch(true); }, 10*60000); }
+document.getElementById('watchRefreshBtn').addEventListener('click', ()=> loadWatch(true));
+document.getElementById('watchNotifyBtn').addEventListener('click', async ()=>{
+  if(!('Notification' in window)){ document.getElementById('watchNotifyLine').textContent = 'This browser can\'t show pop-ups. You\'ll still see a red count on the Watch tab.'; return; }
+  const r = await Notification.requestPermission();
+  renderWatchNotify(r);
+});
+function renderWatchNotify(r){
+  r = r || ('Notification' in window ? Notification.permission : 'unsupported');
+  const line = document.getElementById('watchNotifyLine'), btn = document.getElementById('watchNotifyBtn');
+  if(r === 'granted'){ line.textContent = 'Pop-ups are on. You\'ll get one when a new big-risk or watch-it alert shows up while the app is open or in the background.'; btn.style.display = 'none'; }
+  else if(r === 'denied'){ line.textContent = 'Pop-ups are blocked for this site. Allow notifications for it in the browser settings to turn them on.'; btn.style.display = 'none'; }
+}
+
 // ---------- auto save ----------
 // Every 15 s: write every list to storage, plus whatever is half-typed in a
 // box, so a crash or a dead battery loses nothing. Each save also keeps a
@@ -6118,6 +6388,7 @@ async function onAppOpen(){
     if(navigator.onLine){ refreshArea(a); retryPendingGeocodes(); }
   }
   checkMovedAway();
+  loadWatch(); startWatchTimer();
 }
 // When the app opens somewhere new, the saved working area can be a different
 // town. If location is already allowed, check quietly and offer to switch.
