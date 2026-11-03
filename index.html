@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Storm Ops</title>
-<meta name="theme-color" content="#0d1520">
+<meta name="theme-color" content="#0b1626">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -553,6 +553,77 @@
   .gallery-actions button{ min-height:52px; border-radius:10px; }
   .gallery-close, .webview-close{ width:46px; height:46px; border-radius:12px; }
   @media (prefers-reduced-motion: reduce){ .alert-flash{ animation:none; } }
+
+  /* ---- v4 "storm crew" look: navy command bar with hazard striping,
+     contour-map background, rugged plate cards, condensed signage type.
+     Header stays navy in light mode too (brand + sun-readable white on navy). ---- */
+  :root{
+    --hdr: #0b1626; --hdr-2: #122540; --hdr-line: #243b5a; --hdr-text: #f3f6fa; --hdr-dim: #9fb2c9;
+    --stripe: repeating-linear-gradient(-45deg, #ff7a1a 0 12px, #0b1626 12px 24px);
+    --plate: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 18px -12px rgba(0,0,0,.6);
+    --contour: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%237f9bbd' stroke-opacity='.09' stroke-width='1.2'%3E%3Cpath d='M-20 60c40-30 80 20 120-5s70-40 160 10'/%3E%3Cpath d='M-20 95c50-25 85 25 125 0s75-35 155 12'/%3E%3Cpath d='M-20 135c45-30 90 18 130-6s70-30 150 14'/%3E%3Cpath d='M-20 180c40-20 95 22 135-2s65-36 145 8'/%3E%3Cpath d='M-20 220c55-28 90 20 130-4s70-30 150 10'/%3E%3Cellipse cx='175' cy='40' rx='28' ry='14'/%3E%3Cellipse cx='175' cy='40' rx='14' ry='7'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  :root[data-theme="light"]{ --plate: 0 1px 0 #fff inset, 0 6px 14px -10px rgba(15,30,50,.35); }
+  @media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --plate: 0 1px 0 #fff inset, 0 6px 14px -10px rgba(15,30,50,.35); } }
+  body{ background-color:var(--bg); background-image:var(--contour), radial-gradient(120% 50% at 100% 0%, var(--accent-glow), transparent 60%); background-size:240px 240px, auto; background-attachment:fixed; }
+
+  .topbar{ background:linear-gradient(170deg, var(--hdr-2) 0%, var(--hdr) 75%); color:var(--hdr-text); box-shadow:0 10px 24px -14px rgba(0,0,0,.7); border-bottom:0; padding-bottom:0; }
+  .topbar::after{ content:""; display:block; height:6px; margin:0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); background:var(--stripe); }
+  .topbar .eyebrow{ color:#ff9a4d; }
+  .brand-text h1{ color:var(--hdr-text); font-size:27px; letter-spacing:.06em; }
+  .logo{ box-shadow:0 0 0 2px #ff7a1a, 0 4px 10px rgba(0,0,0,.4); }
+  .theme-btn{ background:rgba(255,255,255,.06); border-color:var(--hdr-line); color:var(--hdr-text); }
+  .topbar .net-pill{ background:rgba(54,194,123,.14); color:#7ff0b0; border:1px solid rgba(54,194,123,.4); }
+  .topbar .net-pill.off{ background:rgba(255,100,100,.14); color:#ffb0b0; border-color:rgba(255,100,100,.4); }
+  .where-bar{ position:relative; background:linear-gradient(90deg, #ff7a1a, #ff8f3a); color:#1a0d02; border-radius:6px; padding:9px 34px 9px 18px; font-family:var(--font-display); font-weight:600; font-size:15px; letter-spacing:.03em; text-transform:uppercase; box-shadow:0 3px 0 #b84900; overflow:hidden; }
+  .where-bar::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:8px; background:repeating-linear-gradient(-45deg, #0b1626 0 4px, transparent 4px 8px); }
+  .where-bar::after{ content:"›"; position:absolute; right:12px; top:50%; transform:translateY(-52%); font-size:22px; font-family:var(--font-body); }
+  .tabs{ padding:2px 0 10px; }
+  .tab{ color:var(--hdr-dim); border-radius:10px; }
+  .tab:hover{ color:var(--hdr-text); }
+  .tab.active{ color:#1a0d02; background:#ff7a1a; border-color:#ff7a1a; box-shadow:0 3px 0 #b84900, 0 6px 16px rgba(255,122,26,.3); }
+  .tab .tab-badge{ box-shadow:0 0 0 2px var(--hdr); }
+
+  .section-label{ font-family:var(--font-display); font-weight:600; font-size:18px; letter-spacing:.05em; text-transform:uppercase; border-bottom:0; padding-bottom:6px; position:relative; }
+  .section-label::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:linear-gradient(90deg, var(--accent) 0 64px, var(--line) 64px); border-radius:2px; }
+  .section-label::before{ width:10px; height:10px; border-radius:2px; transform:rotate(45deg); }
+  .eyebrow{ letter-spacing:.16em; }
+  .shop-town, .area-name{ font-family:var(--font-display); text-transform:uppercase; letter-spacing:.04em; }
+  .hint{ color:var(--text-dim); }
+
+  .card, .shop-card, .install-box, .owner-card, .area-card, .wx-cell, .pack-cell, .storm-link, .live-cat, .check-row, .city-tot, .wind-now{ box-shadow:var(--plate); border-width:1.5px; }
+  .card, .shop-card{ border-radius:10px; }
+  .shop-card{ border-left:4px solid var(--line); }
+  .shop-card.trusted{ border-left-color:var(--gold-text); }
+  .install-box{ border-style:solid; border-left:4px solid var(--accent); background:var(--panel); }
+  .area-card{ border-left-width:8px; position:relative; overflow:hidden; }
+  .area-card::after{ content:""; position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; border:14px solid var(--accent-glow); }
+  .shop-cat{ font-family:var(--font-display); text-transform:uppercase; letter-spacing:.05em; font-weight:600; font-size:16px; }
+  .shop-group{ display:flex; align-items:center; gap:8px; }
+  .shop-group::after{ content:""; flex:1; height:6px; background:repeating-linear-gradient(-45deg, var(--line) 0 3px, transparent 3px 7px); border-radius:2px; }
+  .shop-dist{ font-weight:700; }
+
+  .locate-btn{ font-family:var(--font-display); letter-spacing:.06em; text-transform:uppercase; border-radius:10px; background:#ff7a1a; color:#1a0d02; box-shadow:0 4px 0 #b84900, 0 8px 18px -8px rgba(255,122,26,.6); }
+  .locate-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #b84900; }
+  .locate-btn.secondary{ background:var(--panel); color:var(--text); border:1.5px solid var(--line); box-shadow:0 3px 0 var(--line); }
+  .add-btn{ font-family:var(--font-display); letter-spacing:.06em; text-transform:uppercase; box-shadow:0 4px 0 #0b5a32; }
+  .add-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #0b5a32; }
+  .small-btn{ border-width:1.5px; box-shadow:0 2px 0 var(--line); font-family:var(--font-display); letter-spacing:.05em; }
+  .small-btn:active{ transform:translateY(2px); box-shadow:none; }
+  .small-btn.go{ background:#ff7a1a; border-color:#ff7a1a; color:#1a0d02; box-shadow:0 2px 0 #b84900; }
+  .shop-btns > *{ border-width:1.5px; box-shadow:0 2px 0 var(--line); }
+  .shop-btns .call{ box-shadow:0 2px 0 #0b5a32; }
+  .manage-btn{ border:1.5px dashed var(--accent); color:var(--accent); font-family:var(--font-display); letter-spacing:.06em; }
+  .icon-btn{ border-width:1.5px; }
+  .job-chip, .shop-chip{ border-width:1.5px; font-weight:600; }
+  .job-chip.on, .shop-chip.on{ box-shadow:0 2px 0 #b84900; }
+  .status-line{ border-left:3px solid var(--line); padding-left:8px; }
+  .status-line.ok{ border-left-color:var(--ok); } .status-line.warn{ border-left-color:#e0a100; }
+  #leafletMap, .mini-map, .aff-map, #salesMap{ border:1.5px solid var(--line); border-radius:12px; }
+  .toast{ background:var(--hdr); color:var(--hdr-text); border:1px solid var(--hdr-line); border-left:4px solid #ff7a1a; }
+  .wt-card{ border-left-width:6px; }
+  .wt-pill.t1{ box-shadow:0 2px 0 #8f1424; } .wt-pill.t2{ box-shadow:0 2px 0 #a35f00; }
+  .empty-state{ border:1.5px dashed var(--line); border-radius:12px; background:var(--panel); }
 </style>
 </head>
 <body>
