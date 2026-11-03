@@ -276,6 +276,12 @@
   /* live nearby search */
   #salesMap.drawing{ outline:3px solid #ffd166; cursor:crosshair; }
   .tab{ position:relative; }
+  .aff-cam{ font-size:18px; line-height:22px; text-align:center; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+  .cam-strip{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; }
+  .cam-tile{ flex:0 0 170px; background:var(--panel); border:1.5px solid var(--line); border-radius:10px; padding:0; overflow:hidden; text-align:left; color:var(--text); }
+  .cam-tile img{ width:100%; height:100px; object-fit:cover; display:block; background:#000; }
+  .cam-tile span{ display:block; padding:6px 8px; font-size:12px; font-weight:600; line-height:1.25; }
+  .cam-tile small{ font-weight:400; color:var(--text-dim); }
   .tab-badge{ position:absolute; top:3px; right:6px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:#d7263d; color:#fff; font-size:11px; line-height:18px; font-family:var(--font-mono); }
   .wt-sum{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
   .wt-pill{ border-radius:16px; padding:6px 11px; font-size:13px; font-weight:600; border:1px solid var(--line); background:var(--panel); }
@@ -1123,6 +1129,8 @@
       <button class="small-btn go" id="affLoadBtn" type="button">Refresh</button>
     </div>
     <div class="aff-toggles">
+      <label class="aff-tg on"><input type="checkbox" id="affShowPath" checked> 🌪️ Storm path</label>
+      <label class="aff-tg on"><input type="checkbox" id="affShowCams" checked> 📷 Cameras</label>
       <label class="aff-tg on"><input type="checkbox" id="affShowOut" checked> ⚡ Outage / damage</label>
       <label class="aff-tg on"><input type="checkbox" id="affShowGust" checked> 💨 High gusts</label>
       <label class="aff-tg on"><input type="checkbox" id="affShowRoads" checked> 🚧 Road closures</label>
@@ -1132,8 +1140,12 @@
     <div id="affMap" class="aff-map"></div>
     <div class="aff-legend">
       <div><span class="sw" style="background:#ffd23f"></span>Some reports <span class="sw" style="background:#ff8c1a"></span>Many <span class="sw" style="background:#e5242b"></span>Hardest hit</div>
+      <div><span class="sw" style="background:rgba(255,140,26,.45); border:1px solid #ff8c1a"></span>Storm path (severe storm warnings; darker = hit more than once) <span class="sw" style="background:rgba(229,36,43,.45); border:1px solid #e5242b"></span>Tornado warning</div>
       <div><span class="dot" style="background:#9aa1a8"></span>Gust under 40 <span class="dot" style="background:#ff8c1a"></span>40 to 57 mph <span class="dot" style="background:#e5242b"></span>58+ mph (severe)</div>
     </div>
+    <p class="section-label" style="margin-top:14px;">Cameras Near the Damage</p>
+    <p class="hint">Live state traffic cameras (Iowa DOT, Illinois / Travel Midwest). Tap one on the map or below for the latest picture; tap a damaged spot or storm path to see the cameras closest to it.</p>
+    <div id="camList"></div>
     <p class="section-label" style="margin-top:14px;">Road Closures</p>
     <div id="roadList"></div>
     <p class="section-label" style="margin-top:14px;">Hardest Hit Spots</p>
@@ -4854,13 +4866,15 @@ function openAffected(){
   if(!affMap){
     affMap = L.map('affMap', { zoomControl:true }).setView(c ? [c.lat, c.lng] : [40.5, -89], c ? 11 : 6);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' }).addTo(affMap);
+    affLayers.path = L.layerGroup().addTo(affMap);
     affLayers.out = L.layerGroup().addTo(affMap);
+    affLayers.cams = L.layerGroup().addTo(affMap);
     affLayers.gust = L.layerGroup().addTo(affMap);
     affLayers.zones = L.layerGroup().addTo(affMap);
     affLayers.me = L.layerGroup().addTo(affMap);
     affLayers.roads = L.layerGroup().addTo(affMap);
     drawCityOutlines(affMap);
-    [['affShowOut','out'],['affShowGust','gust'],['affShowZones','zones'],['affShowRoads','roads']].forEach(([id,k])=>{
+    [['affShowPath','path'],['affShowCams','cams'],['affShowOut','out'],['affShowGust','gust'],['affShowZones','zones'],['affShowRoads','roads']].forEach(([id,k])=>{
       const cb = document.getElementById(id);
       cb.addEventListener('change', ()=>{ cb.checked ? affMap.addLayer(affLayers[k]) : affMap.removeLayer(affLayers[k]); cb.parentElement.classList.toggle('on', cb.checked); });
     });
@@ -4910,6 +4924,10 @@ async function loadAffected(){
   if(!out.stations.length) out.failed.push('station gusts');
   const sl = await getJSON('stormLayers', null);
   if(sl && sl.dat) out.dat = sl.dat.map(f=>({ lat:(f.geometry||{}).y, lng:(f.geometry||{}).x })).filter(p=> p.lat != null && inRange(p.lat, p.lng));
+  setStatus('affStatus', 'Loading the storm path and cameras…');
+  const [path, cams] = await Promise.all([loadStormPath(c, radius, hours).catch(()=>null), loadCameras(c, radius).catch(()=>null)]);
+  out.path = path || []; if(!path) out.failed.push('storm path');
+  out.cams = cams || []; if(!cams) out.failed.push('cameras');
   setStatus('affStatus', 'Checking road closures…');
   out.roads = await loadRoadClosures(c, radius).catch(()=>({ items:[], failed:['road closures'] }));
   affData = out;
@@ -4979,6 +4997,7 @@ function drawAffected(){
       .bindTooltip(`${z.kind === 'outage' ? '⚡' : '🌪️'} ${escapeHtml(z.name)}`, { direction:'center' }).addTo(affLayers.zones);
   });
   L.circleMarker([c.lat, c.lng], { radius:7, color:'#fff', weight:3, fillColor:'#2f80ed', fillOpacity:1 }).bindPopup(escapeHtml(c.name)).addTo(affLayers.me);
+  drawStormPath(D); drawCameras(D);
   drawRoads(D);
   L.circle([c.lat, c.lng], { radius: D.radius * 1609, color:'#2f80ed', weight:1, dashArray:'4 6', fill:false, interactive:false }).addTo(affLayers.me);
 
@@ -5020,9 +5039,84 @@ function drawAffected(){
   affMap._affGrid = { dLat, dLng, c };
   if(!affMap._fitted){ affMap.setView([c.lat, c.lng], D.radius <= 10 ? 12 : D.radius <= 25 ? 10 : 9); affMap._fitted = true; }
 }
+// ---------- storm path + cameras ----------
+// Path: every severe thunderstorm / tornado / extreme wind warning polygon
+// the NWS issued in the time window (Iowa Environmental Mesonet archive).
+// Stacked, they trace where the storm went; darker = warned more than once.
+const PATH_PH = { SV:['Severe Thunderstorm Warning', '#ff8c1a'], TO:['Tornado Warning', '#e5242b'], EW:['Extreme Wind Warning', '#b3001b'] };
+async function loadStormPath(c, radius, hours){
+  const iso = t=> new Date(t).toISOString().slice(0, 16) + 'Z';
+  const d = await fetchJSON(`https://mesonet.agron.iastate.edu/api/1/vtec/sbw_interval.geojson?begints=${iso(Date.now() - hours * 3600000)}&endts=${iso(Date.now())}`, {}, 30000);
+  const reach = radius * 2.5; // the path matters a bit past the search circle
+  return (d.features || []).filter(f=>{
+    const pr = f.properties || {};
+    if(!PATH_PH[pr.phenomena] || pr.significance !== 'W' || !f.geometry) return false;
+    const ce = centroidOf(f.geometry);
+    return ce && distMiles(c.lat, c.lng, ce.lat, ce.lng) <= reach;
+  }).map(f=>{ const pr = f.properties; return { ph: pr.phenomena, geom: f.geometry, issue: pr.utc_issue, expire: pr.utc_expire, places: pr.locations || '', wfo: pr.wfo }; });
+}
+function drawStormPath(D){
+  (D.path || []).slice().sort((a, b)=> (a.issue || '').localeCompare(b.issue || '')).forEach(w=>{
+    const [label, col] = PATH_PH[w.ph];
+    const ce = centroidOf(w.geom);
+    try{
+      L.geoJSON(w.geom, { style:{ color: col, weight:1.5, fillColor: col, fillOpacity: w.ph === 'SV' ? .16 : .26 } })
+        .bindPopup(()=> `<div class="popup-title">🌪️ ${label}</div>${escapeHtml(w.places)}<br><small>${w.issue ? new Date(w.issue).toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit' }) : ''}${w.expire ? ' to ' + new Date(w.expire).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : ''}</small>${ce ? nearCamsHtml(ce.lat, ce.lng) : ''}`, { maxWidth: 300 })
+        .addTo(affLayers.path);
+    }catch(e){}
+  });
+}
+// Cameras: free, keyless state DOT camera layers that include a snapshot.
+const CAMERA_SOURCES = [
+  { name:'Iowa DOT', url:'https://services.arcgis.com/8lRhdTsQyJpO52F1/ArcGIS/rest/services/Traffic_Cameras_View/FeatureServer/0',
+    map: a=>({ lat:+a.latitude, lng:+a.longitude, name: a.Desc_ || a.ImageName || 'Camera', img: a.ImageURL, video: a.VideoURL || '', page:'' }) },
+  { name:'Illinois / Travel Midwest', url:'https://services2.arcgis.com/aIrBD8yn1TDTEXoz/ArcGIS/rest/services/TrafficCamerasTM_Public/FeatureServer/0',
+    map: a=>({ lat:+a.y, lng:+a.x, name: [a.CameraLocation, a.CameraDirection && a.CameraDirection !== 'NONE' ? a.CameraDirection : ''].filter(Boolean).join(' · '), img: a.SnapShot, video:'', page: a.ImgPath || '', age: a.AgeInMinutes != null ? +a.AgeInMinutes : null, old: String(a.TooOld) === 'true' }) }
+];
+async function loadCameras(c, radius){
+  const dLat = radius / 69, dLng = radius / (69 * Math.cos(c.lat * Math.PI / 180));
+  const env = encodeURIComponent(`${c.lng - dLng},${c.lat - dLat},${c.lng + dLng},${c.lat + dLat}`);
+  const all = await Promise.all(CAMERA_SOURCES.map(src=>
+    fetchJSON(`${src.url}/query?where=1%3D1&geometry=${env}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&resultRecordCount=400&f=json`, {}, 20000)
+      .then(d=> (d.features || []).map(f=> ({ ...src.map(f.attributes || {}), src: src.name })))
+      .catch(()=> null)));
+  if(all.every(x=> x === null)) return null;
+  return all.flat().filter(x=> x && x.img && isFinite(x.lat) && isFinite(x.lng) && distMiles(c.lat, c.lng, x.lat, x.lng) <= radius)
+    .map(x=>({ ...x, dist: distMiles(c.lat, c.lng, x.lat, x.lng) })).sort((a, b)=> a.dist - b.dist);
+}
+function camImg(x){ return x.img + (x.img.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 60000); } // skip stale browser copies
+function camPopup(x){
+  return `<div class="popup-title">📷 ${escapeHtml(x.name)}</div>
+    <img src="${escapeHtml(camImg(x))}" alt="" style="width:260px; max-width:100%; border-radius:6px; display:block; margin:4px 0;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'Picture didn\u2019t load (camera may be offline).',style:'font-size:12px'}))">
+    <small>${escapeHtml(x.src)}${x.age != null ? ` · picture ${x.age} min old${x.old ? ' (stale)' : ''}` : ''}</small>
+    <div style="margin-top:4px;">${x.video ? `<a href="${escapeHtml(x.video)}" target="_blank" rel="noopener">▶ Live video</a> · ` : ''}${x.page ? `<a href="${escapeHtml(x.page)}" target="_blank" rel="noopener">Camera page</a> · ` : ''}<a href="#" onclick="event.preventDefault(); const i=this.closest('.leaflet-popup-content').querySelector('img'); if(i) i.src=i.src.replace(/t=\d+/, 't='+Date.now());">↻ Newer picture</a></div>`;
+}
+function nearCamsHtml(lat, lng){
+  const cams = (affData && affData.cams || []).map(x=>({ x, d: distMiles(lat, lng, x.lat, x.lng) })).filter(o=> o.d <= 8).sort((a, b)=> a.d - b.d).slice(0, 3);
+  if(!cams.length) return `<div style="font-size:11.5px; margin-top:6px; color:#666;">No public cameras within 8 mi of here.</div>`;
+  return `<div style="margin-top:6px; font-weight:700; font-size:12px;">📷 Closest cameras</div>` + cams.map(o=>`<div style="margin-top:4px;"><img src="${escapeHtml(camImg(o.x))}" alt="" style="width:240px; max-width:100%; border-radius:5px; display:block;" loading="lazy"><small>${escapeHtml(o.x.name)} · ${o.d.toFixed(1)} mi</small></div>`).join('');
+}
+function drawCameras(D){
+  const cams = D.cams || [];
+  cams.forEach(x=>{
+    L.marker([x.lat, x.lng], { icon: L.divIcon({ className:'aff-cam', html:'📷', iconSize:[22,22] }) }).bindPopup(()=> camPopup(x), { maxWidth: 290 }).addTo(affLayers.cams);
+  });
+  const el = document.getElementById('camList'); if(!el) return;
+  const a = currentArea(), st = a && a.stateCode;
+  const covered = /^(IA|IL)$/.test(st || '');
+  el.innerHTML = cams.length ? `<div class="cam-strip">${cams.slice(0, 12).map((x, i)=>`<button class="cam-tile" onclick="affCam(${i})"><img src="${escapeHtml(camImg(x))}" alt="" loading="lazy"><span>${escapeHtml(x.name)}<br><small>${x.dist.toFixed(1)} mi${x.age != null ? ' · ' + x.age + ' min old' : ''}</small></span></button>`).join('')}</div>`
+    : `<div class="cat-empty">${covered ? 'No public cameras found inside this search circle. Try 50 mi.' : `Live camera pictures in the app cover Iowa and Illinois for now. ${st && STATE_511[st] ? `<a href="${STATE_511[st]}" target="_blank" rel="noopener">Open the ${st} 511 camera map</a>.` : ''}`}</div>`;
+}
+function affCam(i){
+  const x = affData && affData.cams && affData.cams[i]; if(!x || !affMap) return;
+  document.getElementById('affMap').scrollIntoView({ behavior:'smooth', block:'center' });
+  affMap.setView([x.lat, x.lng], Math.max(affMap.getZoom(), 12));
+  L.popup({ maxWidth: 290 }).setLatLng([x.lat, x.lng]).setContent(camPopup(x)).openOn(affMap);
+}
+
 function cellPopup(x){
   const lines = x.reports.slice(0, 6).map(r=>`<div style="font-size:12px; margin-top:4px;"><b>${escapeHtml(r.type)}</b>${r.city ? ' · ' + escapeHtml(r.city) : ''}<br>${escapeHtml(r.remark || '')}</div>`).join('');
-  return `<div class="popup-title">${x.power ? '⚡ Likely outages' : 'Storm damage'}</div>${lines}${x.reports.length > 6 ? `<div style="font-size:11px;">+${x.reports.length - 6} more</div>` : ''}${x.dat ? `<div style="font-size:12px;">${x.dat} NWS damage survey point(s)</div>` : ''}`;
+  return `<div class="popup-title">${x.power ? '⚡ Likely outages' : 'Storm damage'}</div>${lines}${x.reports.length > 6 ? `<div style="font-size:11px;">+${x.reports.length - 6} more</div>` : ''}${x.dat ? `<div style="font-size:12px;">${x.dat} NWS damage survey point(s)</div>` : ''}${x.pts && x.pts.length ? nearCamsHtml(x.pts[0][0], x.pts[0][1]) : ''}`;
 }
 function affSpotBounds(n){
   const x = affCells[n], G = affMap && affMap._affGrid; if(!x || !G) return null;
