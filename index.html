@@ -630,6 +630,26 @@
   .wt-card{ border-left-width:6px; }
   .wt-pill.t1{ box-shadow:0 2px 0 #8f1424; } .wt-pill.t2{ box-shadow:0 2px 0 #a35f00; }
   .empty-state{ border:1.5px dashed var(--line); border-radius:12px; background:var(--panel); }
+
+  /* v4.2 polish */
+  .daylight{ display:inline-block; margin:4px 0 2px; font-size:13px; color:var(--text); }
+  .daylight b{ color:var(--accent); }
+  [hidden]{ display:none !important; }
+  .status-line:empty, .geocode-status:empty{ display:none; }
+  .manage-btn{ border:1.5px solid var(--accent) !important; background:var(--accent) !important; color:#fff !important; font-weight:700; box-shadow:0 2px 0 rgba(0,0,0,.18); }
+  .call-clamp .card-sub.wrap{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer; }
+  .call-clamp .card-sub.wrap.open{ display:block; -webkit-line-clamp:unset; }
+  .call-clamp .card-sub.wrap:not(.open)::after{ content:''; }
+  .more-hint{ font-size:12px; color:var(--accent); font-weight:700; margin-top:2px; }
+  .map-layers{ margin:12px 0 4px; border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:4px 12px; }
+  .map-layers > summary{ min-height:44px; display:flex; align-items:center; font-weight:700; cursor:pointer; list-style:none; }
+  .map-layers > summary::-webkit-details-marker{ display:none; }
+  .map-layers > summary::after{ content:'▾'; margin-left:auto; color:var(--accent); }
+  .map-layers[open] > summary::after{ content:'▴'; }
+  .map-layers[open]{ padding-bottom:12px; }
+  .leaflet-bottom.leaflet-left .acc-chip{ margin-bottom:24px; }
+  .see-all-btn{ display:flex; width:100%; align-items:center; justify-content:center; gap:8px; min-height:48px; margin:8px 0 4px; border-radius:10px; border:1.5px solid var(--accent); background:transparent; color:var(--accent); font-weight:800; font-size:14px; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; }
+  .check-more{ width:100%; min-height:44px; margin-top:6px; border-radius:10px; border:1px dashed var(--line); background:transparent; color:var(--text-dim); font-weight:700; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -703,8 +723,8 @@
       <button class="small-btn" id="checkEditBtn" type="button">✏️ Edit List</button>
     </div>
 
-    <p class="section-label">Who To Call Here</p>
-    <div id="hereCallList"></div>
+    <p class="section-label">Quick Calls</p>
+    <div id="hereCallList" class="call-clamp"></div>
 
     <p class="section-label" style="margin-top:20px;">Saved Areas</p>
     <p class="hint">Every area you load stays on this phone. Tap one to switch back to it, even with no signal.</p>
@@ -737,7 +757,7 @@
     </div>
     <p class="section-label">Who To Call Here</p>
     <p class="hint" id="contactsAreaLine">Load an area on the Here tab and local offices fill in automatically.</p>
-    <div id="contactsCallList"></div>
+    <div id="contactsCallList" class="call-clamp"></div>
 
     <p class="section-label" style="margin-top:18px;">Local Offices Found Nearby</p>
     <p class="hint">Village halls, sheriff and police, fire departments, courthouses, and county offices from the open map. Tap ★ to keep one in your saved contacts.</p>
@@ -959,6 +979,15 @@
   <div class="view" id="view-map">
     <p class="section-label">Storm Response Map</p>
     <div class="status-line" id="mapStatus">Tap any lot to see the owner, add photos, or flag it. Switch to Satellite with the layer button on the map.</div>
+    <div class="zone-bar" id="zoneBar">
+      <button class="small-btn go" id="zoneDrawBtn" type="button">✏️ Draw Search Zone</button>
+      <button class="small-btn" id="zoneUndoBtn" type="button" hidden>Undo Point</button>
+      <button class="small-btn go" id="zoneFinishBtn" type="button" hidden>Finish Zone</button>
+      <button class="small-btn" id="zoneCancelBtn" type="button" hidden>Cancel</button>
+    </div>
+    <div id="leafletMap"></div>
+    <details class="map-layers" id="mapLayers">
+      <summary>🗂️ Map layers &amp; storm dates</summary>
     <div class="field-row" style="display:flex; gap:8px;">
       <div class="field" style="flex:1;"><label>Storm Date From</label><input type="date" id="windDateFrom"></div>
       <div class="field" style="flex:1;"><label>To</label><input type="date" id="windDateTo"></div>
@@ -976,13 +1005,7 @@
       <label class="map-toggle on"><input type="checkbox" id="toggleDamage" checked> Damage Surveys</label>
       <label class="map-toggle"><input type="checkbox" id="toggleRadar"> Live Radar</label>
     </div>
-    <div class="zone-bar" id="zoneBar">
-      <button class="small-btn go" id="zoneDrawBtn" type="button">✏️ Draw Search Zone</button>
-      <button class="small-btn" id="zoneUndoBtn" type="button" hidden>Undo Point</button>
-      <button class="small-btn go" id="zoneFinishBtn" type="button" hidden>Finish Zone</button>
-      <button class="small-btn" id="zoneCancelBtn" type="button" hidden>Cancel</button>
-    </div>
-    <div id="leafletMap"></div>
+    </details>
     <p style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); margin-top:8px;">Base map &amp; nearby search: OpenStreetMap. Satellite imagery: Esri (free). Wind reports are real NWS Local Storm Reports. Outage data isn't publicly available from utilities to overlay directly — use the Sales tab links for live outage maps.</p>
 
     <p class="section-label" style="margin-top:16px;">Power Outages</p>
@@ -1478,6 +1501,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+    try{ btn.scrollIntoView({ block:'nearest', inline:'center', behavior:'smooth' }); }catch(e){}
     if(btn.dataset.tab === 'here') renderCities();
     if(btn.dataset.tab === 'owner') initOwnerPick();
     if(btn.dataset.tab === 'watch'){ const b = document.getElementById('watchBadge'); b.hidden = true; b.textContent = ''; loadWatch(); renderWatchNotify(); setTimeout(()=>{ if(miniMaps.watchMap) miniMaps.watchMap.invalidateSize(); else if(watchData) drawWatchMap(watchData.alerts); }, 80); }
@@ -4012,7 +4036,7 @@ function weatherHtml(wx){
     ${windNowHtml(wx.now)}
     ${windHourlyHtml(wx.hourly)}
     ${wx.periods && wx.periods.length ? `<div class="wx-row">${wx.periods.slice(0, 4).map(p=>`<div class="wx-cell" title="${escapeHtml(p.detail || '')}"><div class="wx-when">${escapeHtml(p.name)}</div><div class="wx-temp">${p.temp}°</div><div class="wx-desc">${escapeHtml(p.short)}</div><div class="wx-wind">${windArrow(compassToDeg(p.windDir), 12)} ${escapeHtml((p.windSpeed || p.wind || '').trim())} ${escapeHtml(p.windDir || '')}</div>${p.gust != null ? `<div class="wx-desc${gustClass(p.gust)}">Gusts ${p.gust}</div>` : ''}</div>`).join('')}</div>` : ''}
-    <div class="fresh" style="margin:-12px 0 16px;">National Weather Service · updated ${timeAgo(wx.time)}${wx.alerts && !wx.alerts.length ? ' · no active alerts here' : ''}</div>`;
+    <div class="fresh" style="margin:${wx.periods && wx.periods.length ? '-12px' : '4px'} 0 16px;">National Weather Service · updated ${timeAgo(wx.time)}${wx.alerts && !wx.alerts.length ? ' · no active alerts here' : ''}</div>`;
 }
 async function renderHereWeather(){
   const el = document.getElementById('hereWeather'); if(!el) return;
@@ -5175,6 +5199,7 @@ async function loadChecklist(){
   if(!checklistItems){ checklistItems = STARTER_CHECKLIST.map((t,i)=>({ id:'ck_s' + i, text:t, starter:true })); }
 }
 async function saveChecklist(){ await setJSON('checklistItems', checklistItems); }
+let checkShowAll = false;
 function renderChecklist(){
   const el = document.getElementById('checklist'); if(!el) return;
   const a = currentArea();
@@ -5183,7 +5208,7 @@ function renderChecklist(){
   const pct = checklistItems.length ? Math.round(done / checklistItems.length * 100) : 0;
   document.getElementById('checkEditBtn').textContent = checkEditing ? 'Done Editing' : '✏️ Edit List';
   el.innerHTML = (a ? `<div class="hint" style="margin-bottom:4px;">${done} of ${checklistItems.length} done in ${escapeHtml(a.town || 'this area')}</div><div class="check-progress"><span style="width:${pct}%"></span></div>` : '<div class="hint">Load an area to start checking items off.</div>') +
-    checklistItems.map((it, i)=> checkEditing ? `
+    (checkEditing || checkShowAll ? checklistItems : checklistItems.filter(it=>!checks[it.id]).slice(0, 4)).map((it, i)=> checkEditing ? `
       <div class="check-row">
         <input type="text" value="${escapeHtml(it.text)}" onchange="editCheckItem('${it.id}', this.value)" style="flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text); padding:8px; border-radius:4px; font-size:14px;" aria-label="Item text">
         <button class="icon-btn" onclick="moveCheckItem(${i},-1)" aria-label="Move up" ${i===0?'disabled':''}>↑</button>
@@ -5193,7 +5218,9 @@ function renderChecklist(){
       <div class="check-row${checks[it.id] ? ' done' : ''}">
         <input type="checkbox" class="need-check" id="chk_${it.id}" ${checks[it.id] ? 'checked' : ''} ${a ? '' : 'disabled'} onchange="toggleCheck('${it.id}')">
         <label for="chk_${it.id}">${escapeHtml(it.text)}${it.starter ? '<span class="starter-tag">starter</span>' : ''}${checks[it.id] ? `<span class="check-when">Done ${new Date(checks[it.id]).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' })}</span>` : ''}</label>
-      </div>`).join('');
+      </div>`).join('') +
+    (!checkEditing && checklistItems.length > 4 ? `<button type="button" class="check-more" onclick="checkShowAll=!checkShowAll; renderChecklist();">${checkShowAll ? 'Show only what\u2019s left' : `Show all ${checklistItems.length} items` + (done ? ` (${done} done)` : '')}</button>` : '') +
+    (!checkEditing && !checkShowAll && a && done === checklistItems.length && checklistItems.length ? '<div class="hint">✅ All done for this area.</div>' : '');
 }
 async function toggleCheck(id){
   const a = currentArea(); if(!a) return;
@@ -5901,6 +5928,14 @@ function savedContactsFor(a){
   const t = (a.town||'').toLowerCase(), c = (a.county||'').toLowerCase();
   return officials.filter(o=> (t && (o.city||'').toLowerCase().includes(t)) || (c && (o.county||'').toLowerCase().replace(/\s*county$/,'') === c));
 }
+document.addEventListener('click', e=>{ const t = e.target.closest('.call-clamp .card-sub.wrap'); if(t && !e.target.closest('a,button')) t.classList.toggle('open'); });
+function quickCallsHtml(a){
+  if(!a) return callListHtml(a);
+  const tmp = document.createElement('div'); tmp.innerHTML = callListHtml(a);
+  const cards = [...tmp.querySelectorAll('.card')].filter(c=> c.querySelector('a[href^="tel:"]')).slice(0, 5);
+  return (cards.length ? `<div class="call-group">${cards.map(c=>c.outerHTML).join('')}</div>` : '') +
+    `<button type="button" class="see-all-btn" onclick="document.querySelector('.tab[data-tab=&quot;contacts&quot;]').click()">📞 All contacts for ${escapeHtml(bareTown(a.town || 'this area'))} ›</button>`;
+}
 function callListHtml(a){
   if(!a) return `<div class="empty-state">Load an area and this fills in with the people to call there: the electric utility, county assessor and GIS, road departments, the village hall, the sheriff, and anyone you've saved.</div>`;
   const co = a.county ? a.county + ' County' : 'county', st = a.state || '';
@@ -5953,12 +5988,35 @@ function renderWhere(){
   bar.classList.toggle('loading', !!refreshing);
   el.textContent = a ? `Working in ${[bareTown(a.town), a.stateCode || a.state].filter(Boolean).join(', ')}${a.county ? ' · ' + a.county + ' Co.' : ''}${refreshing ? ' · updating…' : ''}` : "No area loaded. Tap here, then I'm Here.";
 }
+// Sunrise / sunset from the NOAA solar formula (works offline). Crews plan cutting around daylight.
+function sunTimes(lat, lng, date = new Date()){
+  const rad = Math.PI / 180, day = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 864e5);
+  const g = 2 * Math.PI / 365 * (day - 1);
+  const eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const cosH = (Math.cos(90.833 * rad) / (Math.cos(lat * rad) * Math.cos(decl))) - Math.tan(lat * rad) * Math.tan(decl);
+  if(cosH > 1 || cosH < -1) return null;
+  const ha = Math.acos(cosH) / rad;
+  const at = mins=>{ const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())); d.setUTCMinutes(Math.round(mins)); return d; };
+  return { rise: at(720 - 4 * (lng + ha) - eq), set: at(720 - 4 * (lng - ha) - eq) };
+}
+function daylightHtml(lat, lng){
+  if(lat == null || lng == null) return '';
+  const t = sunTimes(lat, lng); if(!t) return '';
+  const now = Date.now(), fmt = d=> d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+  let left = '';
+  if(now < t.rise) left = 'before sunrise';
+  else if(now < t.set){ const m = Math.round((t.set - now) / 60000); left = `<b>${Math.floor(m / 60)}h ${m % 60}m of light left</b>`; }
+  else left = 'after dark, use lights';
+  return `<span class="daylight">☀️ Sunrise ${fmt(t.rise)} · Sunset ${fmt(t.set)} · ${left}</span><br>`;
+}
+setInterval(()=>{ if(document.querySelector('#view-here.active') && currentArea()) renderHere(); }, 5 * 60000);
 function renderHere(){
   renderWhere();
   const a = currentArea();
   document.getElementById('areaName').textContent = a ? [a.town, a.stateCode || a.state].filter(Boolean).join(', ') : 'No area set yet';
   document.getElementById('areaSub').innerHTML = a
-    ? `${escapeHtml(a.county ? a.county + ' County' : 'County unknown')}${a.township ? ' · ' + escapeHtml(a.township) : ''}<br>${freshness(a.refreshed, 'Everything')}${fixLine(a)}`
+    ? `${escapeHtml(a.county ? a.county + ' County' : 'County unknown')}${a.township ? ' · ' + escapeHtml(a.township) : ''}<br>${daylightHtml(a.lat, a.lng)}${freshness(a.refreshed, 'Everything')}${fixLine(a)}`
     : 'Tap the button when you arrive somewhere new. The app pulls local contacts, shops, the electric utility, and the county\'s property records, then keeps a copy on this phone for when you lose signal.';
   const grid = document.getElementById('packGrid');
   if(a){
@@ -5974,7 +6032,7 @@ function renderHere(){
     const key = spot.lat.toFixed(5) + ',' + spot.lng.toFixed(5);
     if(hm.dataset.at !== key){ hm.hidden = false; hm.dataset.at = key; miniMap('hereMiniMap', spot.lat, spot.lng, null); if(miniMaps.hereMiniMap) miniMaps.hereMiniMap.setZoom(16); }
   }else if(!spot) hm.hidden = true;
-  document.getElementById('hereCallList').innerHTML = callListHtml(a);
+  document.getElementById('hereCallList').innerHTML = quickCallsHtml(a);
   renderChecklist();
   renderHereWeather();
   renderCities();
